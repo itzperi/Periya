@@ -1,0 +1,341 @@
+{
+  "agent_name": "AI Sales Outreach Assistant",
+  "version": "1.0",
+  "description": "Automated cold email campaign generator with personalized initial and follow-up emails",
+  
+  "capabilities": [
+    "Lead research and analysis",
+    "Personalized email generation",
+    "Follow-up sequence creation",
+    "Subject line optimization",
+    "Industry-specific messaging"
+  ],
+  
+  "input_schema": {
+    "type": "object",
+    "required": ["leads", "product_info"],
+    "properties": {
+      "leads": {
+        "type": "array",
+        "description": "List of leads to process",
+        "items": {
+          "type": "object",
+          "required": ["name", "company", "role", "industry"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Lead's full name",
+              "example": "John Smith"
+            },
+            "company": {
+              "type": "string",
+              "description": "Company name",
+              "example": "TechCorp Inc"
+            },
+            "role": {
+              "type": "string",
+              "description": "Lead's job title",
+              "example": "VP of Sales"
+            },
+            "industry": {
+              "type": "string",
+              "description": "Lead's industry",
+              "example": "SaaS"
+            },
+            "website": {
+              "type": "string",
+              "description": "Company website URL (optional)",
+              "example": "https://techcorp.com"
+            },
+            "pain_point": {
+              "type": "string",
+              "description": "Known challenge or problem (optional)",
+              "example": "Low conversion rates"
+            }
+          }
+        }
+      },
+      "product_info": {
+        "type": "object",
+        "required": ["name", "description", "value_proposition"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Your product/service name",
+            "example": "SalesBoost AI"
+          },
+          "description": {
+            "type": "string",
+            "description": "What your product does",
+            "example": "AI-powered sales automation platform"
+          },
+          "value_proposition": {
+            "type": "string",
+            "description": "Main benefit you provide",
+            "example": "Increase qualified leads by 300% in 90 days"
+          },
+          "key_features": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Key features to highlight",
+            "example": ["AI lead scoring", "Automated outreach", "CRM integration"]
+          }
+        }
+      },
+      "campaign_settings": {
+        "type": "object",
+        "properties": {
+          "tone": {
+            "type": "string",
+            "enum": ["professional", "casual", "executive", "technical", "friendly"],
+            "default": "professional",
+            "description": "Email tone preference"
+          },
+          "cta_type": {
+            "type": "string",
+            "enum": ["book_call", "schedule_demo", "download_resource", "reply", "visit_website"],
+            "default": "book_call",
+            "description": "Primary call-to-action"
+          },
+          "email_length": {
+            "type": "integer",
+            "default": 150,
+            "description": "Maximum word count for emails"
+          },
+          "follow_up_delay_days": {
+            "type": "integer",
+            "default": 4,
+            "description": "Days to wait before follow-up"
+          }
+        }
+      }
+    }
+  },
+  
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "campaign_id": {
+        "type": "string",
+        "description": "Unique campaign identifier"
+      },
+      "generated_at": {
+        "type": "string",
+        "format": "date-time",
+        "description": "Timestamp of generation"
+      },
+      "total_leads": {
+        "type": "integer",
+        "description": "Number of leads processed"
+      },
+      "emails": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "lead_name": {
+              "type": "string",
+              "description": "Lead's full name"
+            },
+            "company": {
+              "type": "string",
+              "description": "Company name"
+            },
+            "role": {
+              "type": "string",
+              "description": "Lead's job title"
+            },
+            "industry": {
+              "type": "string",
+              "description": "Lead's industry"
+            },
+            "email_subject_initial": {
+              "type": "string",
+              "description": "Subject line for initial email"
+            },
+            "initial_email": {
+              "type": "string",
+              "description": "Personalized initial email body"
+            },
+            "email_subject_followup": {
+              "type": "string",
+              "description": "Subject line for follow-up email"
+            },
+            "followup_email": {
+              "type": "string",
+              "description": "Personalized follow-up email body"
+            },
+            "personalization_notes": {
+              "type": "string",
+              "description": "Research insights used for personalization"
+            }
+          }
+        }
+      }
+    }
+  },
+  
+  "email_generation_rules": {
+    "initial_email": {
+      "max_words": 150,
+      "structure": [
+        "Personalized opening with name and company",
+        "Relevant insight about their industry/company",
+        "Clear value proposition",
+        "Specific benefit or result",
+        "Strong, clear CTA"
+      ],
+      "avoid": [
+        "Generic greetings",
+        "Spammy language",
+        "Multiple CTAs",
+        "Excessive exclamation marks",
+        "Buzzwords without context"
+      ]
+    },
+    "follow_up_email": {
+      "max_words": 120,
+      "structure": [
+        "Polite reference to previous email",
+        "New value angle or perspective",
+        "Additional proof point or benefit",
+        "Clear, low-pressure CTA"
+      ],
+      "avoid": [
+        "Repetitive messaging",
+        "Pushy language",
+        "Guilt-tripping",
+        "Assuming they missed your email"
+      ]
+    },
+    "subject_lines": {
+      "best_practices": [
+        "Keep under 50 characters",
+        "Include company name when relevant",
+        "Ask questions or create curiosity",
+        "Avoid spam trigger words",
+        "Personalize when possible"
+      ],
+      "avoid": [
+        "ALL CAPS",
+        "Excessive punctuation (!!!)",
+        "Spam words (FREE, ACT NOW, LIMITED TIME)",
+        "Generic subjects"
+      ]
+    }
+  },
+  
+  "personalization_strategy": {
+    "research_points": [
+      "Company size and growth stage",
+      "Recent company news or announcements",
+      "Industry challenges and trends",
+      "Role-specific pain points",
+      "Technology stack (if available)",
+      "Competitor landscape"
+    ],
+    "personalization_levels": {
+      "high": "Company-specific insight + role-specific pain point + custom value prop",
+      "medium": "Industry insight + role relevance + standard value prop",
+      "low": "Role acknowledgment + general value prop"
+    }
+  },
+  
+  "example_input": {
+    "leads": [
+      {
+        "name": "Sarah Johnson",
+        "company": "CloudScale Solutions",
+        "role": "Head of Marketing",
+        "industry": "B2B SaaS",
+        "website": "https://cloudscale.example.com",
+        "pain_point": "Low email open rates"
+      }
+    ],
+    "product_info": {
+      "name": "EmailBoost Pro",
+      "description": "AI-powered email optimization platform",
+      "value_proposition": "Increase email open rates by 45% using AI-driven subject line testing",
+      "key_features": [
+        "AI subject line generator",
+        "A/B testing automation",
+        "Deliverability optimization"
+      ]
+    },
+    "campaign_settings": {
+      "tone": "professional",
+      "cta_type": "schedule_demo",
+      "email_length": 150,
+      "follow_up_delay_days": 4
+    }
+  },
+  
+  "example_output": {
+    "campaign_id": "camp_abc123",
+    "generated_at": "2025-10-01T10:30:00Z",
+    "total_leads": 1,
+    "emails": [
+      {
+        "lead_name": "Sarah Johnson",
+        "company": "CloudScale Solutions",
+        "role": "Head of Marketing",
+        "industry": "B2B SaaS",
+        "email_subject_initial": "Quick question about CloudScale's email engagement",
+        "initial_email": "Hi Sarah,\n\nI noticed CloudScale Solutions recently expanded your product line—congrats on the growth! As a B2B SaaS marketer, you know email engagement can make or break pipeline.\n\nWe've helped similar companies increase open rates by 45% using AI-driven subject line optimization. Our clients typically see improvements within the first month.\n\nWould you be open to a quick 15-minute demo to see how this could work for CloudScale?\n\nBest,\n[Your Name]",
+        "email_subject_followup": "One more thing about email performance",
+        "followup_email": "Hi Sarah,\n\nI sent a note last week about improving email engagement at CloudScale Solutions.\n\nI wanted to share something specific: we recently helped a B2B SaaS company in your space boost their demo requests by 63% just by optimizing their outreach emails.\n\nNo pressure—but if you're interested in seeing how, I'm happy to show you in 15 minutes.\n\nBest,\n[Your Name]",
+        "personalization_notes": "Used company growth, role-specific challenges, and industry benchmarks for personalization"
+      }
+    ]
+  },
+  
+  "integration_options": {
+    "email_platforms": [
+      "Gmail API",
+      "Outlook API",
+      "SendGrid",
+      "Mailgun",
+      "Amazon SES"
+    ],
+    "crm_systems": [
+      "Salesforce",
+      "HubSpot",
+      "Pipedrive",
+      "Copper"
+    ],
+    "automation_tools": [
+      "Zapier",
+      "Make (Integromat)",
+      "n8n"
+    ]
+  },
+  
+  "best_practices": {
+    "timing": {
+      "best_send_days": ["Tuesday", "Wednesday", "Thursday"],
+      "best_send_times": ["9:00-11:00 AM", "1:00-3:00 PM"],
+      "timezone": "Recipient's local timezone"
+    },
+    "testing": {
+      "a_b_test_subject_lines": true,
+      "track_open_rates": true,
+      "track_click_rates": true,
+      "track_reply_rates": true
+    },
+    "compliance": {
+      "include_unsubscribe": true,
+      "gdpr_compliant": true,
+      "can_spam_compliant": true,
+      "honor_opt_outs": true
+    }
+  },
+  
+  "performance_metrics": {
+    "target_open_rate": "25-35%",
+    "target_reply_rate": "5-10%",
+    "target_meeting_book_rate": "2-5%",
+    "follow_up_improvement": "15-20% higher reply rate"
+  }
+}
