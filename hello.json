@@ -1,0 +1,514 @@
+{
+  "name": "TryCom AI - US Lead Generation with Apify & Groq",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysOfWeek": [
+                {
+                  "day": "Monday"
+                },
+                {
+                  "day": "Tuesday"
+                },
+                {
+                  "day": "Wednesday"
+                },
+                {
+                  "day": "Thursday"
+                },
+                {
+                  "day": "Friday"
+                }
+              ],
+              "hoursInterval": 2
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/apify~linkedin-search-scraper/run-sync-get-dataset-items?token=YOUR_APIFY_API_KEY",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"search\": \"CEO OR Founder OR CTO OR 'VP Marketing' OR 'Marketing Director' OR 'Head of Growth'\",\n  \"country\": \"United States\",\n  \"maxResults\": 50,\n  \"locations\": [\"United States\"],\n  \"industries\": [\"Marketing\", \"SaaS\", \"Software\", \"Digital Marketing\", \"Marketing Automation\"],\n  \"companySize\": [\"11-50\", \"51-200\", \"201-500\"]\n}",
+        "options": {}
+      },
+      "id": "apify-linkedin-scraper",
+      "name": "Apify - LinkedIn Scraper",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 300],
+      "notes": "Scrapes LinkedIn profiles using Apify"
+    },
+    {
+      "parameters": {
+        "jsCode": "const leads = [];\n\nfor (const item of $input.all()) {\n  const data = Array.isArray(item.json) ? item.json : [item.json];\n  \n  for (const person of data) {\n    if (person.firstName && person.lastName) {\n      leads.push({\n        firstName: person.firstName || '',\n        lastName: person.lastName || '',\n        fullName: person.fullName || `${person.firstName} ${person.lastName}`,\n        title: person.title || person.headline || '',\n        company: person.company || person.currentCompany || '',\n        companyWebsite: person.companyWebsite || '',\n        location: person.location || '',\n        linkedinUrl: person.url || person.linkedinUrl || '',\n        summary: person.summary || person.about || '',\n        industry: person.industry || ''\n      });\n    }\n  }\n}\n\nreturn leads.map(lead => ({ json: lead }));"
+      },
+      "id": "parse-linkedin-data",
+      "name": "Parse LinkedIn Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/apify~email-finder/run-sync-get-dataset-items?token=YOUR_APIFY_API_KEY",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"firstName\": \"{{ $json.firstName }}\",\n  \"lastName\": \"{{ $json.lastName }}\",\n  \"company\": \"{{ $json.company }}\",\n  \"domain\": \"{{ $json.companyWebsite }}\"\n}",
+        "options": {}
+      },
+      "id": "apify-email-finder",
+      "name": "Apify - Email Finder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [850, 300],
+      "notes": "Finds email addresses using Apify"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.item.json;\nconst emailData = Array.isArray(input) ? input[0] : input;\n\nreturn {\n  json: {\n    ...$input.item.json,\n    email: emailData?.email || emailData?.emails?.[0] || `${$input.item.json.firstName.toLowerCase()}.${$input.item.json.lastName.toLowerCase()}@${$input.item.json.companyWebsite}`.replace('https://', '').replace('http://', '').split('/')[0],\n    emailConfidence: emailData?.confidence || 'estimated'\n  }\n};"
+      },
+      "id": "extract-email",
+      "name": "Extract Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.email }}",
+              "operation": "isNotEmpty"
+            },
+            {
+              "value1": "={{ $json.email }}",
+              "operation": "contains",
+              "value2": "@"
+            }
+          ]
+        }
+      },
+      "id": "filter-valid-contacts",
+      "name": "Filter Valid Contacts",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/apify~website-content-crawler/run-sync-get-dataset-items?token=YOUR_APIFY_API_KEY",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"startUrls\": [{\"url\": \"{{ $json.companyWebsite }}\"}],\n  \"maxCrawlDepth\": 1,\n  \"maxCrawlPages\": 3\n}",
+        "options": {}
+      },
+      "id": "scrape-company-website",
+      "name": "Scrape Company Website",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1450, 200],
+      "notes": "Get company info from their website"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.item.json;\nconst websiteData = Array.isArray(input) ? input : [input];\n\nlet companyDescription = '';\nlet services = '';\n\nfor (const page of websiteData) {\n  if (page.text) {\n    companyDescription += page.text.substring(0, 500) + ' ';\n  }\n}\n\nreturn {\n  json: {\n    ...$input.item.json,\n    companyDescription: companyDescription.trim(),\n    scrapedAt: new Date().toISOString()\n  }\n};"
+      },
+      "id": "parse-website-data",
+      "name": "Parse Website Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1650, 200]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "firstName": "={{ $json.firstName }}",
+            "lastName": "={{ $json.lastName }}",
+            "email": "={{ $json.email }}",
+            "title": "={{ $json.title }}",
+            "company": "={{ $json.company }}",
+            "companyWebsite": "={{ $json.companyWebsite }}",
+            "industry": "={{ $json.industry }}",
+            "linkedinUrl": "={{ $json.linkedinUrl }}",
+            "location": "={{ $json.location }}",
+            "status": "New",
+            "dateAdded": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "save-to-sheet",
+      "name": "Save to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [1850, 200],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_CREDENTIALS",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_GROQ_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are an expert B2B cold email copywriter. Write personalized, conversational cold emails that don't sound like sales pitches. Focus on the recipient's specific challenges and how TryCom AI can help.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Write a personalized cold email for TryCom AI to:\\n\\nRecipient Details:\\n- Name: {{ $json.firstName }} {{ $json.lastName }}\\n- Title: {{ $json.title }}\\n- Company: {{ $json.company }}\\n- Industry: {{ $json.industry }}\\n- Location: {{ $json.location }}\\n- Company Info: {{ $json.companyDescription }}\\n\\nAbout TryCom AI:\\nTryCom AI is a white-label marketing automation and CRM platform similar to HighLevel and SPP. We help marketing agencies, consultants, and SaaS companies scale by providing:\\n- All-in-one CRM & automation\\n- White-label solution they can rebrand\\n- Lead generation tools\\n- Email & SMS marketing\\n- Landing page builder\\n- Client management\\n- Recurring revenue opportunities\\n\\nEmail Requirements:\\n1. Start with a relevant hook based on their role/company\\n2. Mention a specific pain point for their industry\\n3. Briefly explain how TryCom AI solves it (focus on ONE key benefit)\\n4. Keep it under 120 words\\n5. End with a low-pressure CTA (like asking if they'd be open to a quick overview)\\n6. Make it conversational, not salesy\\n7. Use short paragraphs (2-3 sentences max)\\n8. Do NOT use phrases like 'I hope this email finds you well' or 'reaching out'\\n\\nReturn ONLY the email body text, no subject line, no signatures.\"\n    }\n  ],\n  \"temperature\": 0.8,\n  \"max_tokens\": 500\n}",
+        "options": {}
+      },
+      "id": "groq-personalized-email",
+      "name": "Groq - Generate Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [2050, 200],
+      "notes": "Using Groq's Llama 3.3 70B for fast AI generation"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_GROQ_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Create a compelling email subject line for this cold outreach email. The recipient is {{ $json.firstName }} {{ $json.lastName }}, {{ $json.title }} at {{ $json.company }}. Make it personalized, curiosity-driven, and under 50 characters. Do NOT use emojis. Return ONLY the subject line, nothing else.\"\n    }\n  ],\n  \"temperature\": 0.9,\n  \"max_tokens\": 50\n}",
+        "options": {}
+      },
+      "id": "groq-subject-line",
+      "name": "Groq - Generate Subject",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [2050, 400],
+      "notes": "Generate personalized subject line"
+    },
+    {
+      "parameters": {
+        "jsCode": "const emailResponse = $input.first().json;\nconst subjectResponse = $input.last().json;\n\nconst emailBody = emailResponse.choices[0].message.content.trim();\nconst subjectLine = subjectResponse.choices[0].message.content.trim().replace(/^[\"']|[\"']$/g, '');\n\nreturn {\n  json: {\n    ...$input.first().json,\n    personalizedEmail: emailBody,\n    subject: subjectLine\n  }\n};"
+      },
+      "id": "merge-email-content",
+      "name": "Merge Email Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2250, 300]
+    },
+    {
+      "parameters": {
+        "amount": 8,
+        "unit": "seconds"
+      },
+      "id": "wait-between-sends",
+      "name": "Wait Between Sends",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [2450, 300],
+      "webhookId": "auto-generated"
+    },
+    {
+      "parameters": {
+        "fromEmail": "hello@trycomai.com",
+        "toEmail": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "=Hi {{ $json.firstName }},<br><br>{{ $json.personalizedEmail.replace(/\\n/g, '<br>') }}<br><br>Best regards,<br>Your Name<br>TryCom AI<br><a href='https://trycomai.com'>trycomai.com</a>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "send-email",
+      "name": "Send Email via SMTP",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [2650, 300],
+      "credentials": {
+        "smtp": {
+          "id": "YOUR_SMTP_CREDENTIALS",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "Email Sent",
+            "dateSent": "={{ $now.toISO() }}",
+            "emailSubject": "={{ $json.subject }}"
+          }
+        },
+        "options": {
+          "lookupColumn": "email",
+          "lookupValue": "={{ $json.email }}"
+        }
+      },
+      "id": "update-status",
+      "name": "Update Status in Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [2850, 300]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Apify - LinkedIn Scraper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify - LinkedIn Scraper": {
+      "main": [
+        [
+          {
+            "node": "Parse LinkedIn Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse LinkedIn Data": {
+      "main": [
+        [
+          {
+            "node": "Apify - Email Finder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify - Email Finder": {
+      "main": [
+        [
+          {
+            "node": "Extract Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Email": {
+      "main": [
+        [
+          {
+            "node": "Filter Valid Contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Valid Contacts": {
+      "main": [
+        [
+          {
+            "node": "Scrape Company Website",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scrape Company Website": {
+      "main": [
+        [
+          {
+            "node": "Parse Website Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Website Data": {
+      "main": [
+        [
+          {
+            "node": "Save to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Groq - Generate Email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Groq - Generate Subject",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq - Generate Email": {
+      "main": [
+        [
+          {
+            "node": "Merge Email Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq - Generate Subject": {
+      "main": [
+        [
+          {
+            "node": "Merge Email Content",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Email Content": {
+      "main": [
+        [
+          {
+            "node": "Wait Between Sends",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Between Sends": {
+      "main": [
+        [
+          {
+            "node": "Send Email via SMTP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email via SMTP": {
+      "main": [
+        [
+          {
+            "node": "Update Status in Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-01-15T10:00:00.000Z",
+  "versionId": "2"
+}
