@@ -1,0 +1,620 @@
+{
+  "agent_name": "AI Business Automation Agent",
+  "version": "2.0",
+  "description": "Comprehensive e-commerce business automation with sales tracking, product management, ad monitoring, social media, SEO, and Shopify fulfillment",
+  
+  "role": "AI Business Automation Agent for E-commerce Management",
+  
+  "core_capabilities": [
+    "Sales tracking and analytics",
+    "Product management",
+    "Ad campaign monitoring",
+    "Social media automation",
+    "SEO analysis and optimization",
+    "Automatic order fulfillment",
+    "Email marketing automation",
+    "Multi-platform integration"
+  ],
+
+  "modules": {
+    "sales_and_ads": {
+      "description": "Track sales, manage products, and monitor advertising performance",
+      "components": {
+        "shopify_integration": {
+          "capabilities": [
+            "Fetch all products",
+            "Fetch all orders",
+            "Create new products",
+            "Update existing products",
+            "Sales insights (daily/weekly/monthly)",
+            "Best-selling product analysis"
+          ],
+          "api_endpoints": {
+            "base_url": "https://{shop}.myshopify.com/admin/api/2024-01",
+            "auth_method": "X-Shopify-Access-Token",
+            "endpoints": {
+              "products": "/products.json",
+              "orders": "/orders.json",
+              "product_create": "/products.json",
+              "product_update": "/products/{product_id}.json",
+              "fulfillments": "/orders/{order_id}/fulfillments.json"
+            }
+          },
+          "required_credentials": {
+            "shop_name": "string",
+            "access_token": "string",
+            "api_version": "string"
+          }
+        },
+        "calculator_tool": {
+          "capabilities": [
+            "Revenue calculation",
+            "Profit margin analysis",
+            "Discount calculations",
+            "Total sales aggregation",
+            "Top-performing product insights"
+          ],
+          "formulas": {
+            "revenue": "sum(order.total_price)",
+            "profit_margin": "((revenue - cost) / revenue) * 100",
+            "discount_amount": "original_price - discounted_price",
+            "roi": "((revenue - investment) / investment) * 100"
+          }
+        },
+        "facebook_graph_api": {
+          "capabilities": [
+            "Track ad campaigns",
+            "Monitor ad spending",
+            "Calculate ROI",
+            "Measure ad performance",
+            "Analyze profitability"
+          ],
+          "api_endpoints": {
+            "base_url": "https://graph.facebook.com/v18.0",
+            "auth_method": "access_token",
+            "endpoints": {
+              "campaigns": "/act_{ad_account_id}/campaigns",
+              "insights": "/act_{ad_account_id}/insights",
+              "adsets": "/act_{ad_account_id}/adsets"
+            }
+          },
+          "required_credentials": {
+            "access_token": "string",
+            "ad_account_id": "string"
+          },
+          "metrics": [
+            "impressions",
+            "clicks",
+            "ctr",
+            "cpc",
+            "spend",
+            "conversions",
+            "roas"
+          ]
+        }
+      }
+    },
+    
+    "social_media_marketing": {
+      "description": "Automate social media posts and email campaigns",
+      "components": {
+        "instagram_automation": {
+          "capabilities": [
+            "Generate automated posts",
+            "Product-based content creation",
+            "Campaign update posts",
+            "Performance-driven content"
+          ],
+          "post_triggers": [
+            "Best-selling product updates",
+            "New product launches",
+            "Sales milestones",
+            "Promotional campaigns",
+            "Seasonal events"
+          ],
+          "content_templates": {
+            "product_showcase": {
+              "caption_structure": "🔥 [Product Name] is trending!\n\n[Key benefit]\n\n✨ [Social proof]\n\n🛍️ Shop now: [Link]\n\n[Hashtags]",
+              "hashtag_count": "5-10",
+              "cta_types": ["shop_now", "learn_more", "limited_offer"]
+            },
+            "campaign_update": {
+              "caption_structure": "📢 Exciting news!\n\n[Campaign announcement]\n\n[Details]\n\n[CTA]\n\n[Hashtags]"
+            }
+          },
+          "api_integration": {
+            "platform": "Instagram Graph API",
+            "endpoints": {
+              "publish_post": "/me/media",
+              "publish_story": "/me/media"
+            }
+          }
+        },
+        "mass_email_marketing": {
+          "capabilities": [
+            "Send personalized emails",
+            "Product update notifications",
+            "Offer announcements",
+            "Promotional campaigns",
+            "Segmented email lists"
+          ],
+          "email_types": {
+            "product_update": {
+              "subject": "[New Arrival] Check out our latest products",
+              "segments": ["all_customers", "recent_buyers", "vip_customers"]
+            },
+            "promotional": {
+              "subject": "[Limited Time] Special offer just for you",
+              "segments": ["cart_abandoners", "inactive_customers", "frequent_buyers"]
+            },
+            "transactional": {
+              "subject": "Your order confirmation",
+              "segments": ["recent_orders"]
+            }
+          },
+          "personalization_tokens": [
+            "{first_name}",
+            "{last_purchase}",
+            "{recommended_products}",
+            "{discount_code}"
+          ],
+          "supported_providers": [
+            "SendGrid",
+            "Mailchimp",
+            "Amazon SES",
+            "Klaviyo"
+          ]
+        }
+      }
+    },
+    
+    "custom_agents": {
+      "description": "Specialized tools for SEO and order fulfillment",
+      "components": {
+        "seo_analyzer_tool": {
+          "capabilities": [
+            "Website page analysis",
+            "Technical SEO audit",
+            "Content SEO audit",
+            "Prioritized action recommendations"
+          ],
+          "technical_seo_audit": {
+            "checks": [
+              "URL structure analysis",
+              "Meta tags validation (title, description)",
+              "Page speed measurement",
+              "Mobile-friendliness check",
+              "SSL certificate validation",
+              "Robots.txt analysis",
+              "Sitemap validation",
+              "Canonical tags check",
+              "Schema markup detection"
+            ],
+            "scoring_system": {
+              "excellent": "90-100",
+              "good": "70-89",
+              "needs_improvement": "50-69",
+              "poor": "0-49"
+            }
+          },
+          "content_seo_audit": {
+            "checks": [
+              "Heading hierarchy (H1, H2, H3)",
+              "Keyword density and usage",
+              "Content length analysis",
+              "Internal linking structure",
+              "Image alt text validation",
+              "Content readability score",
+              "Keyword placement (title, headers, body)",
+              "LSI keyword usage"
+            ]
+          },
+          "output_format": {
+            "structure": {
+              "overall_score": "number (0-100)",
+              "technical_score": "number (0-100)",
+              "content_score": "number (0-100)",
+              "critical_issues": "array",
+              "warnings": "array",
+              "recommendations": "array (prioritized)",
+              "action_items": "array (with priority: high/medium/low)"
+            }
+          },
+          "tools_used": [
+            "Lighthouse API",
+            "Google PageSpeed Insights API",
+            "Custom crawlers",
+            "BeautifulSoup/Cheerio for parsing"
+          ]
+        },
+        "automatic_shopify_fulfillment_tool": {
+          "capabilities": [
+            "Fetch unfulfilled orders",
+            "Mark orders as fulfilled automatically",
+            "Batch processing",
+            "Error handling and retry logic",
+            "Fulfillment tracking"
+          ],
+          "workflow": {
+            "steps": [
+              {
+                "step": 1,
+                "action": "Fetch unfulfilled orders",
+                "endpoint": "GET /admin/api/2024-01/orders.json?fulfillment_status=unfulfilled"
+              },
+              {
+                "step": 2,
+                "action": "Validate order eligibility",
+                "checks": ["payment_confirmed", "inventory_available", "shipping_address_valid"]
+              },
+              {
+                "step": 3,
+                "action": "Create fulfillment",
+                "endpoint": "POST /admin/api/2024-01/orders/{order_id}/fulfillments.json",
+                "payload": {
+                  "fulfillment": {
+                    "location_id": "{warehouse_location_id}",
+                    "tracking_number": "{optional}",
+                    "tracking_company": "{optional}",
+                    "notify_customer": true
+                  }
+                }
+              },
+              {
+                "step": 4,
+                "action": "Verify fulfillment success",
+                "retry_logic": {
+                  "max_retries": 3,
+                  "backoff_strategy": "exponential"
+                }
+              },
+              {
+                "step": 5,
+                "action": "Repeat until all orders fulfilled",
+                "termination_condition": "no_unfulfilled_orders_remaining"
+              }
+            ]
+          },
+          "safety_features": {
+            "rate_limiting": "2 requests per second",
+            "dry_run_mode": true,
+            "confirmation_required": "optional",
+            "audit_logging": true
+          }
+        }
+      }
+    }
+  },
+
+  "workflow_logic": {
+    "trigger_mechanisms": [
+      "Telegram bot command",
+      "API webhook",
+      "Scheduled cron job",
+      "Web dashboard action",
+      "Voice command (if integrated)"
+    ],
+    "processing_steps": {
+      "1_receive_request": {
+        "description": "Receive and parse user request",
+        "actions": [
+          "Extract intent from message",
+          "Identify required modules",
+          "Retrieve session context from memory"
+        ]
+      },
+      "2_ai_processing": {
+        "description": "Understand request and route to appropriate module",
+        "actions": [
+          "NLP intent classification",
+          "Entity extraction (dates, products, metrics)",
+          "Module selection logic",
+          "Parameter preparation"
+        ]
+      },
+      "3_module_execution": {
+        "description": "Execute relevant module operations",
+        "routing": {
+          "sales_inquiry": ["shopify_integration", "calculator_tool"],
+          "ad_performance": ["facebook_graph_api", "calculator_tool"],
+          "product_management": ["shopify_integration"],
+          "social_media": ["instagram_automation", "mass_email_marketing"],
+          "seo_request": ["seo_analyzer_tool"],
+          "fulfillment": ["automatic_shopify_fulfillment_tool"]
+        }
+      },
+      "4_response_generation": {
+        "description": "Format and deliver results to user",
+        "actions": [
+          "Aggregate results from multiple modules",
+          "Generate human-readable summary",
+          "Create visualizations (charts/graphs)",
+          "Format for delivery channel",
+          "Send via Telegram/Email/Dashboard"
+        ]
+      }
+    }
+  },
+
+  "intent_classification": {
+    "sales_analytics": {
+      "keywords": ["sales", "revenue", "orders", "best-selling", "top products", "monthly", "weekly", "daily"],
+      "examples": [
+        "Show me this month's sales",
+        "What are the top 5 best-selling products?",
+        "Daily revenue report"
+      ],
+      "modules": ["shopify_integration", "calculator_tool"]
+    },
+    "product_management": {
+      "keywords": ["update product", "create product", "change price", "add product", "edit description"],
+      "examples": [
+        "Update product X with new price",
+        "Create a new product listing",
+        "Change the description of product Y"
+      ],
+      "modules": ["shopify_integration"]
+    },
+    "ad_monitoring": {
+      "keywords": ["ad performance", "campaign", "ROI", "ad spend", "facebook ads", "advertising"],
+      "examples": [
+        "How are my Facebook ads performing?",
+        "What's the ROI on current campaigns?",
+        "Show me ad spend this week"
+      ],
+      "modules": ["facebook_graph_api", "calculator_tool"]
+    },
+    "seo_analysis": {
+      "keywords": ["SEO", "website analysis", "optimize", "search ranking", "site audit"],
+      "examples": [
+        "Analyze my website for SEO",
+        "Run an SEO audit",
+        "Check my site's SEO score"
+      ],
+      "modules": ["seo_analyzer_tool"]
+    },
+    "order_fulfillment": {
+      "keywords": ["fulfill", "unfulfilled orders", "complete orders", "ship", "fulfillment"],
+      "examples": [
+        "Mark all unfulfilled orders as completed",
+        "Process pending orders",
+        "Fulfill all orders automatically"
+      ],
+      "modules": ["automatic_shopify_fulfillment_tool"]
+    },
+    "social_media": {
+      "keywords": ["instagram post", "social media", "create post", "email blast", "send email"],
+      "examples": [
+        "Create Instagram post based on last week's sales",
+        "Send promotional email to customers",
+        "Post about our best-selling product"
+      ],
+      "modules": ["instagram_automation", "mass_email_marketing"]
+    }
+  },
+
+  "behavior_rules": {
+    "priority_system": {
+      "rule_1": "Always prioritize user request and provide actionable output",
+      "rule_2": "Summarize complex analytics in human-readable format",
+      "rule_3": "If multiple modules needed, merge results and aggregate insights",
+      "rule_4": "For errors or failed tasks, suggest manual alternatives",
+      "rule_5": "Retain context for ongoing sessions to allow follow-ups"
+    },
+    "response_formatting": {
+      "structure": {
+        "summary": "Brief 1-2 sentence overview",
+        "key_metrics": "Highlighted important numbers",
+        "insights": "Actionable findings",
+        "recommendations": "Next steps or suggestions",
+        "raw_data": "Optional detailed data"
+      },
+      "tone": "Professional, concise, actionable",
+      "max_response_length": "500 words for Telegram, unlimited for email/dashboard"
+    },
+    "error_handling": {
+      "api_failure": {
+        "response": "I encountered an issue accessing [Service]. You can manually check [URL] or try again in a few minutes.",
+        "log_error": true,
+        "retry_attempts": 3
+      },
+      "insufficient_data": {
+        "response": "I need more information to complete this request. Can you provide [missing_data]?",
+        "suggest_alternatives": true
+      },
+      "ambiguous_request": {
+        "response": "I'm not sure which action you want. Did you mean: [option_1], [option_2], or [option_3]?",
+        "offer_clarification": true
+      }
+    },
+    "session_management": {
+      "context_retention": {
+        "duration": "24 hours",
+        "stored_data": [
+          "Previous queries",
+          "Selected date ranges",
+          "Product filters",
+          "Preferred report format"
+        ]
+      },
+      "follow_up_recognition": [
+        "Show me more details",
+        "What about last month?",
+        "Send that report to my email",
+        "Do the same for product Y"
+      ]
+    }
+  },
+
+  "delivery_channels": {
+    "telegram": {
+      "bot_token_required": true,
+      "supported_formats": [
+        "Text messages",
+        "Images (charts/graphs)",
+        "Documents (CSV/PDF reports)",
+        "Inline buttons for actions"
+      ],
+      "commands": {
+        "/sales": "Get sales report",
+        "/products": "Manage products",
+        "/ads": "Check ad performance",
+        "/seo": "Run SEO audit",
+        "/fulfill": "Process orders",
+        "/social": "Social media actions",
+        "/help": "Show available commands"
+      }
+    },
+    "email": {
+      "formats": [
+        "HTML formatted reports",
+        "PDF attachments",
+        "CSV data exports"
+      ],
+      "scheduling": {
+        "daily_reports": "8:00 AM local time",
+        "weekly_reports": "Monday 9:00 AM",
+        "monthly_reports": "1st of month, 10:00 AM"
+      }
+    },
+    "web_dashboard": {
+      "features": [
+        "Real-time analytics",
+        "Interactive charts",
+        "Drag-and-drop report builder",
+        "Custom date range selection"
+      ]
+    }
+  },
+
+  "example_user_requests": [
+    {
+      "request": "Show me this month's sales and top 5 best-selling products",
+      "intent": "sales_analytics",
+      "modules_used": ["shopify_integration", "calculator_tool"],
+      "expected_response": {
+        "summary": "October 2025 sales: $45,230 from 312 orders",
+        "top_products": [
+          {"name": "Product A", "units_sold": 145, "revenue": "$12,450"},
+          {"name": "Product B", "units_sold": 98, "revenue": "$8,820"},
+          {"name": "Product C", "units_sold": 87, "revenue": "$7,395"},
+          {"name": "Product D", "units_sold": 76, "revenue": "$6,080"},
+          {"name": "Product E", "units_sold": 65, "revenue": "$5,525"}
+        ],
+        "insights": "Product A is leading with 3x higher sales than average. Consider promoting Product B with similar demographics."
+      }
+    },
+    {
+      "request": "Update product X with new price and description",
+      "intent": "product_management",
+      "modules_used": ["shopify_integration"],
+      "required_parameters": {
+        "product_identifier": "X (name or ID)",
+        "new_price": "number",
+        "new_description": "string"
+      },
+      "expected_response": "✅ Product X updated successfully!\n- New price: $XX.XX\n- Description updated\n- Live on your store"
+    },
+    {
+      "request": "Analyze my website for SEO improvements",
+      "intent": "seo_analysis",
+      "modules_used": ["seo_analyzer_tool"],
+      "expected_response": {
+        "overall_score": 72,
+        "critical_issues": 3,
+        "warnings": 8,
+        "top_priorities": [
+          "Add missing meta descriptions (5 pages)",
+          "Optimize image sizes (12 images over 1MB)",
+          "Fix broken internal links (7 links)"
+        ]
+      }
+    },
+    {
+      "request": "Mark all unfulfilled Shopify orders as completed",
+      "intent": "order_fulfillment",
+      "modules_used": ["automatic_shopify_fulfillment_tool"],
+      "expected_response": "🚀 Processing unfulfilled orders...\n\n✅ 23 orders fulfilled successfully\n⚠️ 2 orders pending (payment verification needed)\n❌ 1 order failed (invalid address)\n\nAll eligible orders have been marked as fulfilled and customers notified."
+    },
+    {
+      "request": "Create Instagram post based on last week's sales",
+      "intent": "social_media",
+      "modules_used": ["instagram_automation", "shopify_integration"],
+      "expected_response": "📱 Instagram post created!\n\nCaption: '🔥 Our bestseller last week! [Product Name] is flying off the shelves. Don't miss out! 🛍️'\n\nWould you like me to schedule this post or publish immediately?"
+    },
+    {
+      "request": "Send promotional email to all customers about product discount",
+      "intent": "social_media",
+      "modules_used": ["mass_email_marketing"],
+      "required_parameters": {
+        "discount_code": "string",
+        "discount_percentage": "number",
+        "featured_products": "array"
+      },
+      "expected_response": "📧 Email campaign ready!\n\n👥 Recipients: 3,450 customers\n📝 Subject: Limited Time: 20% Off Your Favorites\n🎯 Segmentation: All active customers\n\nReview and approve to send?"
+    }
+  ],
+
+  "security_and_compliance": {
+    "data_protection": {
+      "encryption": "AES-256 for stored credentials",
+      "api_keys": "Environment variables only, never logged",
+      "customer_data": "GDPR and CCPA compliant handling"
+    },
+    "rate_limiting": {
+      "shopify_api": "2 requests/second",
+      "facebook_api": "200 requests/hour",
+      "email_sending": "Per provider limits"
+    },
+    "audit_logging": {
+      "log_actions": [
+        "Order fulfillments",
+        "Product updates",
+        "Email campaigns sent",
+        "Failed API calls"
+      ],
+      "retention": "90 days"
+    }
+  },
+
+  "performance_metrics": {
+    "target_response_time": "< 3 seconds for queries",
+    "uptime_goal": "99.5%",
+    "success_rate": "> 95% for automated tasks",
+    "user_satisfaction": "Track via feedback commands"
+  },
+
+  "required_integrations": {
+    "shopify": {
+      "credentials": ["shop_name", "access_token"],
+      "permissions": ["read_products", "write_products", "read_orders", "write_orders", "write_fulfillments"]
+    },
+    "facebook": {
+      "credentials": ["access_token", "ad_account_id"],
+      "permissions": ["ads_read", "ads_management"]
+    },
+    "telegram": {
+      "credentials": ["bot_token", "chat_id"]
+    },
+    "email_provider": {
+      "credentials": ["api_key", "sender_email"],
+      "provider_options": ["SendGrid", "Mailchimp", "SES"]
+    },
+    "instagram": {
+      "credentials": ["access_token", "instagram_business_account_id"],
+      "permissions": ["instagram_basic", "instagram_content_publish"]
+    }
+  },
+
+  "setup_instructions": {
+    "step_1": "Configure all API credentials in environment variables",
+    "step_2": "Set up Telegram bot and obtain bot token",
+    "step_3": "Connect Shopify store with appropriate permissions",
+    "step_4": "Link Facebook Ad Account for campaign monitoring",
+    "step_5": "Configure email provider (SendGrid, Mailchimp, etc.)",
+    "step_6": "Set up Instagram Business Account connection",
+    "step_7": "Test each module independently",
+    "step_8": "Enable automated workflows and scheduling",
+    "step_9": "Configure alerts and notification preferences"
+  }
+}
