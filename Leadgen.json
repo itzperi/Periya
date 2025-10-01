@@ -1,0 +1,538 @@
+{
+  "name": "WhatsApp Lead Management - Ready to Deploy",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-capture",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-main",
+      "name": "Webhook - Lead Capture",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 400],
+      "webhookId": "lead-capture-main"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "lead_id",
+              "value": "=LEAD-{{ $now.toUnixInteger() }}"
+            },
+            {
+              "name": "name",
+              "value": "={{ $json.body.name || $json.name || 'Unknown' }}"
+            },
+            {
+              "name": "phone",
+              "value": "={{ $json.body.phone || $json.phone || '' }}"
+            },
+            {
+              "name": "message",
+              "value": "={{ $json.body.message || $json.message || '' }}"
+            },
+            {
+              "name": "source",
+              "value": "={{ $json.body.source || $json.source || 'WhatsApp' }}"
+            },
+            {
+              "name": "timestamp",
+              "value": "={{ $now.format('dd/MM/yyyy HH:mm:ss') }}"
+            },
+            {
+              "name": "status",
+              "value": "New"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "format-lead-data",
+      "name": "Format Lead Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [450, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.message.toLowerCase() }}",
+              "operation": "contains",
+              "value2": "price"
+            },
+            {
+              "value1": "={{ $json.message.toLowerCase() }}",
+              "operation": "contains",
+              "value2": "cost"
+            },
+            {
+              "value1": "={{ $json.message.toLowerCase() }}",
+              "operation": "contains",
+              "value2": "how much"
+            }
+          ]
+        },
+        "combineOperation": "any"
+      },
+      "id": "check-hot-lead",
+      "name": "Is Hot Lead?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 400]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "category",
+              "value": "🔥 Hot Lead - Pricing Inquiry"
+            },
+            {
+              "name": "priority",
+              "value": "HIGH"
+            },
+            {
+              "name": "assigned_to",
+              "value": "Sales Team A"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-hot-lead",
+      "name": "Mark as Hot Lead",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.message.toLowerCase() }}",
+              "operation": "contains",
+              "value2": "visit"
+            },
+            {
+              "value1": "={{ $json.message.toLowerCase() }}",
+              "operation": "contains",
+              "value2": "site"
+            },
+            {
+              "value1": "={{ $json.message.toLowerCase() }}",
+              "operation": "contains",
+              "value2": "viewing"
+            }
+          ]
+        },
+        "combineOperation": "any"
+      },
+      "id": "check-warm-lead",
+      "name": "Is Warm Lead?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 500]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "category",
+              "value": "🌟 Warm Lead - Visit Request"
+            },
+            {
+              "name": "priority",
+              "value": "MEDIUM"
+            },
+            {
+              "name": "assigned_to",
+              "value": "Sales Team B"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-warm-lead",
+      "name": "Mark as Warm Lead",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [1050, 450]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "category",
+              "value": "❄️ Cold Lead - General Inquiry"
+            },
+            {
+              "name": "priority",
+              "value": "LOW"
+            },
+            {
+              "name": "assigned_to",
+              "value": "Sales Team C"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-cold-lead",
+      "name": "Mark as Cold Lead",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [1050, 600]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1KWm_X41F7TV1NEFfMDDuE-wc-YrYjTL7gjfEym8tLos",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Lead ID": "={{ $json.lead_id }}",
+            "Name": "={{ $json.name }}",
+            "Phone": "={{ $json.phone }}",
+            "Message": "={{ $json.message }}",
+            "Category": "={{ $json.category }}",
+            "Priority": "={{ $json.priority }}",
+            "Assigned To": "={{ $json.assigned_to }}",
+            "Source": "={{ $json.source }}",
+            "Timestamp": "={{ $json.timestamp }}",
+            "Status": "={{ $json.status }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "save-to-google-sheets",
+      "name": "Save to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [1250, 450],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_CREDENTIALS_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "accessToken",
+        "chatId": "-7509431600",
+        "text": "=🔔 *NEW LEAD ALERT!*\n\n━━━━━━━━━━━━━━━━━━━━\n\n👤 *Name:* {{ $json.name }}\n📱 *Phone:* {{ $json.phone }}\n💬 *Message:* {{ $json.message }}\n\n━━━━━━━━━━━━━━━━━━━━\n\n🏷️ *Category:* {{ $json.category }}\n⚡ *Priority:* {{ $json.priority }}\n👥 *Assigned:* {{ $json.assigned_to }}\n📍 *Source:* {{ $json.source }}\n⏰ *Time:* {{ $json.timestamp }}\n🆔 *Lead ID:* {{ $json.lead_id }}\n\n━━━━━━━━━━━━━━━━━━━━\n\n🔗 [View in Google Sheet](https://docs.google.com/spreadsheets/d/1KWm_X41F7TV1NEFfMDDuE-wc-YrYjTL7gjfEym8tLos)",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "telegram-notification",
+      "name": "Send Telegram Notification",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [1450, 450],
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIALS_ID",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"lead_id\": $json.lead_id, \"message\": \"Lead captured successfully\" } }}"
+      },
+      "id": "webhook-response",
+      "name": "Send Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1650, 450]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 2
+            }
+          ]
+        }
+      },
+      "id": "schedule-followup-check",
+      "name": "Schedule - Every 2 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 800]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "documentId": {
+          "__rl": true,
+          "value": "1KWm_X41F7TV1NEFfMDDuE-wc-YrYjTL7gjfEym8tLos",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "list"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Status",
+              "lookupValue": "New"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-pending-leads",
+      "name": "Get Pending Leads",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [450, 800],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_CREDENTIALS_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "accessToken",
+        "chatId": "-7509431600",
+        "text": "=📋 *FOLLOW-UP REMINDER*\n\n━━━━━━━━━━━━━━━━━━━━\n\n⚠️ *Pending Leads Require Follow-up*\n\n👤 *Name:* {{ $json['Name'] }}\n📱 *Phone:* {{ $json['Phone'] }}\n💬 *Message:* {{ $json['Message'] }}\n🏷️ *Category:* {{ $json['Category'] }}\n⏰ *Received:* {{ $json['Timestamp'] }}\n\n━━━━━━━━━━━━━━━━━━━━\n\n👉 *Action Required:* Please follow up with this lead immediately!\n\n🔗 [View All Pending Leads](https://docs.google.com/spreadsheets/d/1KWm_X41F7TV1NEFfMDDuE-wc-YrYjTL7gjfEym8tLos)",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "telegram-followup-reminder",
+      "name": "Send Follow-up Reminder",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [650, 800],
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIALS_ID",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1KWm_X41F7TV1NEFfMDDuE-wc-YrYjTL7gjfEym8tLos",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "Follow-up Sent"
+          }
+        },
+        "options": {
+          "dataLocationOnSheet": "detectAutomatically"
+        }
+      },
+      "id": "update-lead-status",
+      "name": "Update Status",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [850, 800],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_CREDENTIALS_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook - Lead Capture": {
+      "main": [
+        [
+          {
+            "node": "Format Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Is Hot Lead?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Hot Lead?": {
+      "main": [
+        [
+          {
+            "node": "Mark as Hot Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Warm Lead?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark as Hot Lead": {
+      "main": [
+        [
+          {
+            "node": "Save to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Warm Lead?": {
+      "main": [
+        [
+          {
+            "node": "Mark as Warm Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark as Cold Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark as Warm Lead": {
+      "main": [
+        [
+          {
+            "node": "Save to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark as Cold Lead": {
+      "main": [
+        [
+          {
+            "node": "Save to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Telegram Notification": {
+      "main": [
+        [
+          {
+            "node": "Send Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule - Every 2 Hours": {
+      "main": [
+        [
+          {
+            "node": "Get Pending Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pending Leads": {
+      "main": [
+        [
+          {
+            "node": "Send Follow-up Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Follow-up Reminder": {
+      "main": [
+        [
+          {
+            "node": "Update Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 2,
+  "updatedAt": "2025-10-01T00:00:00.000Z",
+  "versionId": "1"
+}
