@@ -1,0 +1,486 @@
+{
+  "name": "Vapi Appointment System with Doctor Notifications",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "check-availability",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-check-availability",
+      "name": "Webhook - Check Availability",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "check-availability"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "book-appointment",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-book-appointment",
+      "name": "Webhook - Book Appointment",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 700],
+      "webhookId": "book-appointment"
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "get-doctors",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-get-doctors",
+      "name": "Webhook - Get Doctors",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 1200],
+      "webhookId": "get-doctors"
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "application": "YOUR_AIRTABLE_BASE_ID",
+        "table": "Time Slots",
+        "options": {
+          "filterByFormula": "=AND({Doctor ID}='{{ $json.body.doctor_id }}', {Date}='{{ $json.body.date }}', {Is Booked}='No')"
+        }
+      },
+      "id": "airtable-search-slots",
+      "name": "Airtable - Search Available Slots",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nif (items.length === 0) {\n  return [{\n    json: {\n      available: false,\n      message: \"No slots available for this date\",\n      slots: []\n    }\n  }];\n}\n\nconst formattedSlots = items.map(item => ({\n  slot_id: item.json.id,\n  time: item.json.fields.Time,\n  doctor_id: item.json.fields['Doctor ID'],\n  date: item.json.fields.Date\n}));\n\nreturn [{\n  json: {\n    available: true,\n    slots: formattedSlots,\n    count: formattedSlots.length\n  }\n}];"
+      },
+      "id": "code-format-slots",
+      "name": "Code - Format Available Slots",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "respond-availability",
+      "name": "Respond - Availability",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "application": "YOUR_AIRTABLE_BASE_ID",
+        "table": "Time Slots",
+        "id": "={{ $json.body.slot_id }}",
+        "options": {
+          "bulkSize": 10,
+          "ignoreErrors": false,
+          "typecast": true
+        },
+        "updateAllFields": false,
+        "fields": {
+          "field": [
+            {
+              "fieldId": "Is Booked",
+              "fieldValue": "Yes"
+            }
+          ]
+        }
+      },
+      "id": "airtable-mark-booked",
+      "name": "Airtable - Mark Slot as Booked",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [460, 700],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "application": "YOUR_AIRTABLE_BASE_ID",
+        "table": "Appointments",
+        "options": {},
+        "fields": {
+          "field": [
+            {
+              "fieldId": "Patient Name",
+              "fieldValue": "={{ $json.body.patient_name }}"
+            },
+            {
+              "fieldId": "Patient Phone",
+              "fieldValue": "={{ $json.body.patient_phone }}"
+            },
+            {
+              "fieldId": "Doctor ID",
+              "fieldValue": "={{ $json.body.doctor_id }}"
+            },
+            {
+              "fieldId": "Appointment Date",
+              "fieldValue": "={{ $json.body.date }}"
+            },
+            {
+              "fieldId": "Appointment Time",
+              "fieldValue": "={{ $json.body.time }}"
+            },
+            {
+              "fieldId": "Status",
+              "fieldValue": "Confirmed"
+            },
+            {
+              "fieldId": "Booked At",
+              "fieldValue": "={{ $now.toISO() }}"
+            }
+          ]
+        }
+      },
+      "id": "airtable-create-appointment",
+      "name": "Airtable - Create Appointment",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [680, 700],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "application": "YOUR_AIRTABLE_BASE_ID",
+        "table": "Doctors",
+        "id": "={{ $json.body.doctor_id }}"
+      },
+      "id": "airtable-get-doctor-details",
+      "name": "Airtable - Get Doctor Details",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [900, 700],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "generic",
+        "requestMethod": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $json.fields['Telegram ID'] }}\",\n  \"text\": \"🏥 *New Appointment Booked*\\n\\n👤 Patient: {{ $('Airtable - Create Appointment').item.json.fields['Patient Name'] }}\\n📞 Phone: {{ $('Airtable - Create Appointment').item.json.fields['Patient Phone'] }}\\n📅 Date: {{ $('Airtable - Create Appointment').item.json.fields['Appointment Date'] }}\\n⏰ Time: {{ $('Airtable - Create Appointment').item.json.fields['Appointment Time'] }}\\n\\nPlease confirm or reschedule if needed.\",\n  \"parse_mode\": \"Markdown\"\n}",
+        "options": {}
+      },
+      "id": "telegram-notify-doctor",
+      "name": "Telegram - Notify Doctor",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 700]
+    },
+    {
+      "parameters": {
+        "fromEmail": "{{ $json.senderEmail }}",
+        "toEmail": "={{ $json.fields.Email }}",
+        "subject": "🏥 New Appointment - {{ $('Airtable - Create Appointment').item.json.fields['Appointment Date'] }} at {{ $('Airtable - Create Appointment').item.json.fields['Appointment Time'] }}",
+        "emailType": "html",
+        "message": "=<div style=\"font-family: 'Segoe UI', Arial, sans-serif; max-width: 650px; margin: 0 auto; background-color: #ffffff;\">\n  <!-- Header -->\n  <div style=\"background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;\">\n    <h1 style=\"color: #ffffff; margin: 0; font-size: 28px;\">🏥 New Appointment Booked</h1>\n  </div>\n  \n  <!-- Doctor Greeting -->\n  <div style=\"padding: 30px; background-color: #f8f9fa;\">\n    <h2 style=\"color: #2c3e50; margin-top: 0;\">Dear Dr. {{ $json.fields['Doctor Name'] }},</h2>\n    <p style=\"color: #555; font-size: 16px; line-height: 1.6;\">A new appointment has been scheduled with you. Please review the details below:</p>\n  </div>\n  \n  <!-- Appointment Details Card -->\n  <div style=\"margin: 20px 30px; background-color: #ffffff; border: 2px solid #e3e8ef; border-radius: 12px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);\">\n    <h3 style=\"color: #667eea; margin-top: 0; border-bottom: 2px solid #e3e8ef; padding-bottom: 10px;\">📋 Appointment Details</h3>\n    \n    <table style=\"width: 100%; border-collapse: collapse;\">\n      <tr>\n        <td style=\"padding: 12px 0; border-bottom: 1px solid #f0f0f0;\">\n          <strong style=\"color: #2c3e50;\">👤 Patient Name:</strong>\n        </td>\n        <td style=\"padding: 12px 0; border-bottom: 1px solid #f0f0f0; text-align: right;\">\n          <span style=\"color: #555; font-size: 16px;\">{{ $('Airtable - Create Appointment').item.json.fields['Patient Name'] }}</span>\n        </td>\n      </tr>\n      <tr>\n        <td style=\"padding: 12px 0; border-bottom: 1px solid #f0f0f0;\">\n          <strong style=\"color: #2c3e50;\">📞 Phone Number:</strong>\n        </td>\n        <td style=\"padding: 12px 0; border-bottom: 1px solid #f0f0f0; text-align: right;\">\n          <span style=\"color: #555; font-size: 16px;\">{{ $('Airtable - Create Appointment').item.json.fields['Patient Phone'] }}</span>\n        </td>\n      </tr>\n      <tr>\n        <td style=\"padding: 12px 0; border-bottom: 1px solid #f0f0f0;\">\n          <strong style=\"color: #2c3e50;\">📅 Appointment Date:</strong>\n        </td>\n        <td style=\"padding: 12px 0; border-bottom: 1px solid #f0f0f0; text-align: right;\">\n          <span style=\"color: #667eea; font-size: 18px; font-weight: bold;\">{{ $('Airtable - Create Appointment').item.json.fields['Appointment Date'] }}</span>\n        </td>\n      </tr>\n      <tr>\n        <td style=\"padding: 12px 0;\">\n          <strong style=\"color: #2c3e50;\">⏰ Appointment Time:</strong>\n        </td>\n        <td style=\"padding: 12px 0; text-align: right;\">\n          <span style=\"color: #667eea; font-size: 18px; font-weight: bold;\">{{ $('Airtable - Create Appointment').item.json.fields['Appointment Time'] }}</span>\n        </td>\n      </tr>\n    </table>\n  </div>\n  \n  <!-- Action Buttons -->\n  <div style=\"padding: 20px 30px; text-align: center;\">\n    <p style=\"color: #7f8c8d; font-size: 14px; margin-bottom: 20px;\">You can confirm or reschedule this appointment:</p>\n    <a href=\"https://airtable.com/\" style=\"display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; padding: 14px 35px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; margin: 5px;\">View in Dashboard</a>\n  </div>\n  \n  <!-- Footer -->\n  <div style=\"background-color: #f8f9fa; padding: 25px; text-align: center; border-radius: 0 0 10px 10px; margin-top: 20px;\">\n    <p style=\"color: #95a5a6; font-size: 13px; margin: 5px 0;\">⏱️ Booked at: {{ $now.toFormat('dd/MM/yyyy HH:mm') }}</p>\n    <hr style=\"border: none; border-top: 1px solid #e3e8ef; margin: 20px 0;\">\n    <p style=\"font-size: 12px; color: #95a5a6; margin: 0;\">🏥 This is an automated notification from Your Clinic Management System</p>\n    <p style=\"font-size: 11px; color: #b0b0b0; margin: 10px 0 0 0;\">Please do not reply to this email. For support, contact: support@yourclinic.com</p>\n  </div>\n</div>",
+        "options": {
+          "allowUnauthorizedCerts": false
+        }
+      },
+      "id": "email-notify-doctor",
+      "name": "Email - Notify Doctor",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1120, 850],
+      "credentials": {
+        "smtp": {
+          "id": "YOUR_SMTP_CREDENTIAL_ID",
+          "name": "Gmail SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "requestMethod": "POST",
+        "url": "https://graph.facebook.com/v18.0/YOUR_PHONE_NUMBER_ID/messages",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $json.fields['WhatsApp Number'] }}\",\n  \"type\": \"template\",\n  \"template\": {\n    \"name\": \"appointment_notification\",\n    \"language\": {\n      \"code\": \"en\"\n    },\n    \"components\": [\n      {\n        \"type\": \"body\",\n        \"parameters\": [\n          {\n            \"type\": \"text\",\n            \"text\": \"{{ $('Airtable - Create Appointment').item.json.fields['Patient Name'] }}\"\n          },\n          {\n            \"type\": \"text\",\n            \"text\": \"{{ $('Airtable - Create Appointment').item.json.fields['Appointment Date'] }}\"\n          },\n          {\n            \"type\": \"text\",\n            \"text\": \"{{ $('Airtable - Create Appointment').item.json.fields['Appointment Time'] }}\"\n          }\n        ]\n      }\n    ]\n  }\n}",
+        "options": {}
+      },
+      "id": "whatsapp-notify-doctor",
+      "name": "WhatsApp - Notify Doctor",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 1000],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_WHATSAPP_CREDENTIAL_ID",
+          "name": "WhatsApp Business API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Appointment booked successfully! Doctor has been notified.\",\n  \"appointment\": {\n    \"patient\": \"{{ $('Airtable - Create Appointment').item.json.fields['Patient Name'] }}\",\n    \"doctor\": \"{{ $json.fields['Doctor Name'] }}\",\n    \"date\": \"{{ $('Airtable - Create Appointment').item.json.fields['Appointment Date'] }}\",\n    \"time\": \"{{ $('Airtable - Create Appointment').item.json.fields['Appointment Time'] }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "respond-booking-success",
+      "name": "Respond - Booking Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1340, 700]
+    },
+    {
+      "parameters": {
+        "operation": "list",
+        "application": "YOUR_AIRTABLE_BASE_ID",
+        "table": "Doctors",
+        "options": {}
+      },
+      "id": "airtable-get-all-doctors",
+      "name": "Airtable - Get All Doctors",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [460, 1200],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nconst doctors = items.map(item => ({\n  id: item.json.fields['Doctor ID'],\n  name: item.json.fields['Doctor Name'],\n  specialization: item.json.fields.Specialization,\n  available: true\n}));\n\nreturn [{\n  json: {\n    doctors: doctors,\n    count: doctors.length\n  }\n}];"
+      },
+      "id": "code-format-doctors",
+      "name": "Code - Format Doctors List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 1200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "respond-doctors-list",
+      "name": "Respond - Doctors List",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 1200]
+    },
+    {
+      "parameters": {
+        "authentication": "generic",
+        "requestMethod": "POST",
+        "url": "https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $('Airtable - Create Appointment').item.json.fields['Patient Phone'] }}\",\n  \"text\": \"✅ *Appointment Confirmed*\\n\\n👨‍⚕️ Doctor: {{ $('Airtable - Get Doctor Details').item.json.fields['Doctor Name'] }}\\n📅 Date: {{ $('Airtable - Create Appointment').item.json.fields['Appointment Date'] }}\\n⏰ Time: {{ $('Airtable - Create Appointment').item.json.fields['Appointment Time'] }}\\n\\n📍 Clinic Address: [Your Clinic Address]\\n\\nSee you soon! 😊\",\n  \"parse_mode\": \"Markdown\"\n}",
+        "options": {}
+      },
+      "id": "telegram-notify-patient",
+      "name": "Telegram - Notify Patient",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 550],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "content": "## 🏥 Appointment System with Doctor Notifications\n\n**Features:**\n✅ Check doctor availability\n✅ Book appointments\n✅ Notify doctors via Telegram/Email/WhatsApp\n✅ Notify patients via Telegram\n✅ Store everything in Airtable (Free CRM)\n\n**Setup Required:**\n1. Create Airtable base (structure below)\n2. Get Airtable API key\n3. Choose notification method:\n   - Telegram (FREE, easiest)\n   - Email (FREE with Gmail SMTP)\n   - WhatsApp Business (₹0.25/msg)\n4. Configure Vapi with webhook URLs\n\n**Cost:** ₹1.8-2/min (Vapi only)\n**Notification Cost:** FREE (Telegram/Email)",
+        "height": 440.57647705078125,
+        "width": 423.4822998046875,
+        "color": 5
+      },
+      "id": "sticky-note-overview",
+      "name": "Sticky Note - Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [240, 1440]
+    }
+  ],
+  "connections": {
+    "Webhook - Check Availability": {
+      "main": [
+        [
+          {
+            "node": "Airtable - Search Available Slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Airtable - Search Available Slots": {
+      "main": [
+        [
+          {
+            "node": "Code - Format Available Slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Format Available Slots": {
+      "main": [
+        [
+          {
+            "node": "Respond - Availability",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Book Appointment": {
+      "main": [
+        [
+          {
+            "node": "Airtable - Mark Slot as Booked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Airtable - Mark Slot as Booked": {
+      "main": [
+        [
+          {
+            "node": "Airtable - Create Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Airtable - Create Appointment": {
+      "main": [
+        [
+          {
+            "node": "Airtable - Get Doctor Details",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Telegram - Notify Patient",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Airtable - Get Doctor Details": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Notify Doctor",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Email - Notify Doctor",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "WhatsApp - Notify Doctor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram - Notify Doctor": {
+      "main": [
+        [
+          {
+            "node": "Respond - Booking Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Get Doctors": {
+      "main": [
+        [
+          {
+            "node": "Airtable - Get All Doctors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Airtable - Get All Doctors": {
+      "main": [
+        [
+          {
+            "node": "Code - Format Doctors List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Format Doctors List": {
+      "main": [
+        [
+          {
+            "node": "Respond - Doctors List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-10-04T12:00:00.000Z",
+  "versionId": "2"
+}
