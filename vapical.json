@@ -1,0 +1,200 @@
+{
+  "name": "Cal.com Appointment Booking",
+  "steps": [
+    {
+      "type": "tool",
+      "name": "check_availability",
+      "description": "Check if the requested time slot is available on Cal.com",
+      "input": {
+        "dateFrom": "{{dateFrom}}",
+        "dateTo": "{{dateTo}}",
+        "eventTypeId": "{{eventTypeId}}"
+      },
+      "tool": {
+        "type": "function",
+        "function": {
+          "name": "checkCalAvailability",
+          "description": "Checks availability for a specific time slot",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "dateFrom": {
+                "type": "string",
+                "description": "Start datetime in ISO format (e.g., 2025-10-15T10:00:00Z)"
+              },
+              "dateTo": {
+                "type": "string",
+                "description": "End datetime in ISO format (e.g., 2025-10-15T11:00:00Z)"
+              },
+              "eventTypeId": {
+                "type": "number",
+                "description": "Cal.com event type ID"
+              }
+            },
+            "required": ["dateFrom", "dateTo", "eventTypeId"]
+          },
+          "server": {
+            "url": "https://api.cal.com/v1/availability",
+            "method": "GET",
+            "headers": {
+              "Authorization": "Bearer {{CAL_API_KEY}}",
+              "Content-Type": "application/json"
+            },
+            "queryParams": {
+              "dateFrom": "{{dateFrom}}",
+              "dateTo": "{{dateTo}}",
+              "eventTypeId": "{{eventTypeId}}"
+            }
+          }
+        }
+      },
+      "transitions": [
+        {
+          "condition": "{{check_availability.response.busy == false}}",
+          "next": "book_appointment"
+        },
+        {
+          "condition": "{{check_availability.response.busy == true}}",
+          "next": "slot_unavailable_message"
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "name": "slot_unavailable_message",
+      "message": "I'm sorry, but that time slot is already booked. Could you please provide an alternative date and time for your appointment?",
+      "transitions": [
+        {
+          "next": "check_availability"
+        }
+      ]
+    },
+    {
+      "type": "tool",
+      "name": "book_appointment",
+      "description": "Book the appointment on Cal.com",
+      "input": {
+        "eventTypeId": "{{eventTypeId}}",
+        "start": "{{dateFrom}}",
+        "end": "{{dateTo}}",
+        "name": "{{customerName}}",
+        "email": "{{customerEmail}}",
+        "timeZone": "{{timeZone}}",
+        "metadata": {
+          "notes": "{{appointmentNotes}}"
+        }
+      },
+      "tool": {
+        "type": "function",
+        "function": {
+          "name": "bookCalAppointment",
+          "description": "Books an appointment on Cal.com",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "eventTypeId": {
+                "type": "number",
+                "description": "Cal.com event type ID"
+              },
+              "start": {
+                "type": "string",
+                "description": "Start datetime in ISO format"
+              },
+              "end": {
+                "type": "string",
+                "description": "End datetime in ISO format"
+              },
+              "name": {
+                "type": "string",
+                "description": "Customer's full name"
+              },
+              "email": {
+                "type": "string",
+                "description": "Customer's email address"
+              },
+              "timeZone": {
+                "type": "string",
+                "description": "Timezone (e.g., America/New_York)"
+              },
+              "metadata": {
+                "type": "object",
+                "properties": {
+                  "notes": {
+                    "type": "string",
+                    "description": "Additional notes for the appointment"
+                  }
+                }
+              }
+            },
+            "required": ["eventTypeId", "start", "name", "email"]
+          },
+          "server": {
+            "url": "https://api.cal.com/v1/bookings",
+            "method": "POST",
+            "headers": {
+              "Authorization": "Bearer {{CAL_API_KEY}}",
+              "Content-Type": "application/json"
+            },
+            "body": {
+              "eventTypeId": "{{eventTypeId}}",
+              "start": "{{start}}",
+              "end": "{{end}}",
+              "responses": {
+                "name": "{{name}}",
+                "email": "{{email}}",
+                "notes": "{{metadata.notes}}"
+              },
+              "timeZone": "{{timeZone}}",
+              "language": "en",
+              "metadata": "{{metadata}}"
+            }
+          }
+        }
+      },
+      "transitions": [
+        {
+          "condition": "{{book_appointment.response.status == 'success'}}",
+          "next": "booking_confirmation"
+        },
+        {
+          "condition": "{{book_appointment.response.status == 'error'}}",
+          "next": "booking_error"
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "name": "booking_confirmation",
+      "message": "Great! Your appointment has been successfully booked for {{dateFrom}}. You'll receive a confirmation email at {{customerEmail}} with all the details. Is there anything else I can help you with?",
+      "transitions": [
+        {
+          "next": "end"
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "name": "booking_error",
+      "message": "I apologize, but there was an error processing your booking. Please try again or contact support if the issue persists.",
+      "transitions": [
+        {
+          "next": "end"
+        }
+      ]
+    },
+    {
+      "type": "end",
+      "name": "end"
+    }
+  ],
+  "variables": {
+    "CAL_API_KEY": "YOUR_CAL_COM_API_KEY",
+    "eventTypeId": "YOUR_EVENT_TYPE_ID",
+    "dateFrom": "",
+    "dateTo": "",
+    "customerName": "",
+    "customerEmail": "",
+    "timeZone": "UTC",
+    "appointmentNotes": ""
+  }
+}
