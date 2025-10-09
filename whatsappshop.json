@@ -1,0 +1,120 @@
+{
+  "name": "Birthday WhatsApp Wishes",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "tableId": "customers",
+        "returnAll": true,
+        "additionalFields": {}
+      },
+      "id": "supabase-node",
+      "name": "Get Customers from Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const today = new Date();\nconst todayMonth = today.getMonth() + 1;\nconst todayDay = today.getDate();\n\nconst birthdayCustomers = [];\n\nfor (const item of $input.all()) {\n  const birthday = new Date(item.json.birthday);\n  const birthMonth = birthday.getMonth() + 1;\n  const birthDay = birthday.getDate();\n  \n  if (birthMonth === todayMonth && birthDay === todayDay) {\n    birthdayCustomers.push(item.json);\n  }\n}\n\nreturn birthdayCustomers.map(customer => ({ json: customer }));"
+      },
+      "id": "filter-birthdays",
+      "name": "Filter Today's Birthdays",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "chatId": "={{ $json.phone_number }}",
+        "message": "=🎉 Happy Birthday {{ $json.name }}! 🎂\n\nWishing you a wonderful day filled with joy and happiness!\n\nBest wishes from [Your Shop Name] 🎈",
+        "additionalFields": {}
+      },
+      "id": "whatsapp-node",
+      "name": "Send WhatsApp Birthday Wish",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        850,
+        300
+      ],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "2",
+          "name": "WhatsApp account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Customers from Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Customers from Supabase": {
+      "main": [
+        [
+          {
+            "node": "Filter Today's Birthdays",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Today's Birthdays": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Birthday Wish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
