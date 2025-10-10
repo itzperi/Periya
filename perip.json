@@ -1,0 +1,465 @@
+{
+  "name": "Website Performance Report - Ollama Version",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Conversion Rate Optimizer",
+        "formDescription": "Your Landing Page is Leaking Sales—Fix It Now",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Landing Page Url",
+              "placeholder": "https://example.com/",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a4ffa050-8667-4979-8e26-444f1a483c50",
+      "name": "Landing Page Url",
+      "type": "n8n-nodes-base.formTrigger",
+      "position": [
+        -500,
+        520
+      ],
+      "webhookId": "afe067a5-4878-4c9d-b746-691f77190f54",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "url": "={{ $json['Landing Page Url'] }}",
+        "options": {}
+      },
+      "id": "93d542a6-4273-496a-a6d1-a32fe2420c5e",
+      "name": "Scrape Website",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -300,
+        260
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "url": "=http://localhost:11434/api/generate",
+        "method": "POST",
+        "bodyType": "json",
+        "body": {
+          "model": "mistral",
+          "prompt": "You are the best SEO Manager in the country—a world-class expert in optimizing websites to rank on Google.\n\nAnalyze the content of the webpage and perform a detailed SEO Content Audit.\n\nAudit Structure:\n- Analysis: Content Quality Assessment, Keyword Research and Analysis, Readability Analysis\n- Recommendations: Present recommendations in clear, organized bullet points\n\nHere is the content: {{ $json.data }}\n\nProvide output formatted as clean markdown, without introductory text.",
+          "stream": false
+        },
+        "options": {}
+      },
+      "id": "content-audit-ollama",
+      "name": "Content Audit - Ollama",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        60,
+        460
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "url": "=http://localhost:11434/api/generate",
+        "method": "POST",
+        "bodyType": "json",
+        "body": {
+          "model": "mistral",
+          "prompt": "You are the best SEO Manager in the country—a world-class expert in optimizing websites to rank on Google.\n\nAnalyze the HTML code and perform a detailed On-Page Technical SEO Audit.\n\nAudit Structure:\n- Critical Issues: Must be fixed immediately\n- Quick Wins: Easy fixes with big impact\n- Opportunities for Improvement: Require more effort but offer potential benefits\n\nHere is the content: {{ $json.data }}\n\nProvide output formatted as clean markdown, without introductory text.",
+          "stream": false
+        },
+        "options": {}
+      },
+      "id": "technical-audit-ollama",
+      "name": "Technical Audit - Ollama",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        60,
+        60
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "id": "9df2bdfe-b90c-4739-8a51-d78a2a8353ae",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        560,
+        260
+      ],
+      "typeVersion": 3,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "response"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "09317ae5-82f2-4a4c-9ed8-f7163827f732",
+      "name": "Aggregate",
+      "type": "n8n-nodes-base.aggregate",
+      "position": [
+        760,
+        260
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "mode": "markdownToHtml",
+        "markdown": "=# On-Page Technical Audit\n{{ $json.response[0] }}\n\n# On-Page SEO Content Audit\n{{ $json.response[1] }}\n\n# On-Page Additional Report\n{{ $json.response[2] }}",
+        "options": {}
+      },
+      "id": "1dbdbde7-68b7-4d09-9b28-87b1162e9842",
+      "name": "Markdown",
+      "type": "n8n-nodes-base.markdown",
+      "position": [
+        960,
+        260
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## Send Email \nConnect your credentials & Easily send emails from a Gmail address.",
+        "height": 100,
+        "width": 360,
+        "color": 3
+      },
+      "id": "390d1bc6-18f2-4db8-9c83-bce138818fd9",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1040,
+        100
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## Ollama Setup\n- Install Ollama from ollama.ai\n- Pull model: ollama pull mistral\n- Run: ollama serve (default port 11434)\n- Free local LLM - no API costs!",
+        "height": 140,
+        "width": 420,
+        "color": 3
+      },
+      "id": "b9803d70-a6af-4467-ae18-c845e5ee027f",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        0,
+        -120
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "sendTo": "your-email@gmail.com",
+        "subject": "=On-Page SEO Audit - {{ $('Landing Page Url').item.json['Landing Page Url'] }}",
+        "message": "={{ $json.data }}",
+        "options": {}
+      },
+      "id": "6a91c673-9129-41ea-9d2f-93d7e8544cae",
+      "name": "Send a message",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        1160,
+        260
+      ],
+      "webhookId": "2979e4dc-1689-447e-8cd4-eb907b4eedf4",
+      "typeVersion": 2.1,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "Ru5y8GaP7Ibf5gp3",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://r.jina.ai/{{ $json['Landing Page Url'] }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -280,
+        800
+      ],
+      "id": "0e93218b-1602-4cba-823e-f2127c93fc2d",
+      "name": "Get News"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract news URLs from Jina API response\nconst content = $input.first().json.data || '{\"news_urls\": []}';\nconst parsed = typeof content === 'string' ? JSON.parse(content) : content;\nconst newsUrls = parsed.news_urls || [];\n\nconst output = newsUrls.slice(0, 15).map(url => {\n  return {\n    json: {\n      news_url: url,\n      timestamp: new Date().toISOString()\n    }\n  };\n});\n\nreturn output.length > 0 ? output : [{json: {news_url: '', timestamp: new Date().toISOString()}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        180,
+        880
+      ],
+      "id": "12f5281f-4ba8-43e8-8a45-3e4758d27af1",
+      "name": "Parse URLs"
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": false
+        }
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        420,
+        880
+      ],
+      "id": "f7c35ff4-7a6c-4169-8d0f-5b56abbb69a8",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "url": "=http://localhost:11434/api/generate",
+        "method": "POST",
+        "bodyType": "json",
+        "body": {
+          "model": "mistral",
+          "prompt": "=You are a helpful news summarizer. Analyze this article and provide:\n- Key Points (3 main insights)\n- Summary (2-3 sentences)\n\nArticle: {{ $json.data }}\n\nFormatted as clean, readable text.",
+          "stream": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        1000
+      ],
+      "id": "bc4d7237-3f74-453c-9a8d-9b17a6f7ffcf",
+      "name": "Summarize News - Ollama"
+    },
+    {
+      "parameters": {
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "response"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        720,
+        720
+      ],
+      "id": "5cafc015-32c9-4b80-9026-d7b92337b4f4",
+      "name": "Aggregate News"
+    },
+    {
+      "parameters": {
+        "url": "=http://localhost:11434/api/generate",
+        "method": "POST",
+        "bodyType": "json",
+        "body": {
+          "model": "mistral",
+          "prompt": "=Analyze this company news summary and provide structured insights:\n\nNews Summary: {{ $json.response }}\n\nProvide:\n1. Main Company Activities\n2. Key Updates\n3. Industry Impact\n\nFormat as clean markdown.",
+          "stream": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1340,
+        500
+      ],
+      "id": "aa180bd0-dac0-44a6-b9f4-e477249aef61",
+      "name": "Analyze News - Ollama"
+    }
+  ],
+  "connections": {
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Markdown": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Markdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Content Audit - Ollama": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Scrape Website": {
+      "main": [
+        [
+          {
+            "node": "Content Audit - Ollama",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Technical Audit - Ollama",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Technical Audit - Ollama": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Landing Page Url": {
+      "main": [
+        [
+          {
+            "node": "Scrape Website",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get News": {
+      "main": [
+        [
+          {
+            "node": "Parse URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Summarize News - Ollama",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aggregate News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize News - Ollama": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse URLs": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate News": {
+      "main": [
+        [
+          {
+            "node": "Analyze News - Ollama",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze News - Ollama": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "triggerCount": 1,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}
