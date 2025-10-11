@@ -1,0 +1,299 @@
+{
+  "name": "Customer Birthday WhatsApp Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "customer-form",
+        "options": {},
+        "formTitle": "Customer Registration",
+        "formDescription": "Register customer information",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Customer Name",
+              "fieldType": "text",
+              "requiredField": true,
+              "fieldOptions": {}
+            },
+            {
+              "fieldLabel": "Date of Birth",
+              "fieldType": "date",
+              "requiredField": true,
+              "fieldOptions": {}
+            },
+            {
+              "fieldLabel": "Phone Number",
+              "fieldType": "text",
+              "requiredField": true,
+              "fieldOptions": {
+                "placeholder": "+1234567890"
+              }
+            },
+            {
+              "fieldLabel": "Shop Name",
+              "fieldType": "text",
+              "requiredField": true,
+              "fieldOptions": {}
+            }
+          ]
+        },
+        "responseMode": "onReceived",
+        "formSubmittedText": "Thank you! Your information has been registered."
+      },
+      "id": "form-trigger",
+      "name": "Customer Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "customer-registration"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "tableId": "customers",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "name",
+              "fieldValue": "={{ $json.formData['Customer Name'] }}"
+            },
+            {
+              "fieldId": "date_of_birth",
+              "fieldValue": "={{ $json.formData['Date of Birth'] }}"
+            },
+            {
+              "fieldId": "phone_number",
+              "fieldValue": "={{ $json.formData['Phone Number'] }}"
+            },
+            {
+              "fieldId": "shop_name",
+              "fieldValue": "={{ $json.formData['Shop Name'] }}"
+            }
+          ]
+        }
+      },
+      "id": "supabase-insert",
+      "name": "Insert to Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "customers",
+        "returnAll": true,
+        "filters": {}
+      },
+      "id": "supabase-get-customers",
+      "name": "Get Customers with Birthdays Today",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [250, 500],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Daily Birthday Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [50, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "const today = new Date();\nconst todayMonth = today.getMonth() + 1;\nconst todayDay = today.getDate();\n\nconst birthdayCustomers = [];\n\nfor (const customer of $input.all()) {\n  const dob = new Date(customer.json.date_of_birth);\n  const birthMonth = dob.getMonth() + 1;\n  const birthDay = dob.getDate();\n  \n  if (birthMonth === todayMonth && birthDay === todayDay) {\n    birthdayCustomers.push(customer.json);\n  }\n}\n\nreturn birthdayCustomers.map(customer => ({ json: customer }));"
+      },
+      "id": "filter-birthdays",
+      "name": "Filter Today's Birthdays",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v17.0/YOUR_PHONE_NUMBER_ID/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "messaging_product",
+              "value": "whatsapp"
+            },
+            {
+              "name": "to",
+              "value": "={{ $json.phone_number }}"
+            },
+            {
+              "name": "type",
+              "value": "text"
+            },
+            {
+              "name": "text",
+              "value": "={\"body\": \"Happy Birthday {{ $json.name }}! 🎉🎂 Wishing you a wonderful day from all of us at {{ $json.shop_name }}! We appreciate your continued support.\"}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "send-whatsapp",
+      "name": "Send WhatsApp Birthday Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 500],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2",
+          "name": "WhatsApp Business API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v17.0/YOUR_PHONE_NUMBER_ID/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "messaging_product",
+              "value": "whatsapp"
+            },
+            {
+              "name": "to",
+              "value": "={{ $json['Phone Number'] }}"
+            },
+            {
+              "name": "type",
+              "value": "text"
+            },
+            {
+              "name": "text",
+              "value": "={\"body\": \"Welcome {{ $json['Customer Name'] }}! Thank you for registering with {{ $json['Shop Name'] }}. We're excited to serve you!\"}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "send-welcome-whatsapp",
+      "name": "Send Welcome WhatsApp Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2",
+          "name": "WhatsApp Business API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Customer Form": {
+      "main": [
+        [
+          {
+            "node": "Insert to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert to Supabase": {
+      "main": [
+        [
+          {
+            "node": "Send Welcome WhatsApp Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Birthday Check": {
+      "main": [
+        [
+          {
+            "node": "Get Customers with Birthdays Today",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Customers with Birthdays Today": {
+      "main": [
+        [
+          {
+            "node": "Filter Today's Birthdays",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Today's Birthdays": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Birthday Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-10-11T00:00:00.000Z",
+  "versionId": "1"
+}
