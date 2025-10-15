@@ -1,0 +1,600 @@
+{
+  "workflow_name": "AI Lead Capture & Outreach Agent",
+  "version": "1.0",
+  "description": "Automated lead capture, research, outreach, and follow-up system for consulting business",
+  
+  "configuration": {
+    "lead_filters": {
+      "company_size": {
+        "min_employees": 1,
+        "max_employees": 20
+      },
+      "monitored_keywords": [],
+      "industries": [],
+      "geographic_regions": []
+    },
+    "business_info": {
+      "company_name": "",
+      "consulting_services": [],
+      "value_proposition": "",
+      "sender_name": "",
+      "sender_email": "",
+      "sender_title": ""
+    },
+    "calendar_integration": {
+      "platform": "google_calendar",
+      "booking_url": "",
+      "meeting_duration_minutes": 30,
+      "availability_buffer_hours": 24
+    }
+  },
+
+  "workflow_stages": [
+    {
+      "stage_id": 1,
+      "stage_name": "Lead Capture",
+      "description": "Monitor and capture leads based on input criteria",
+      "trigger": "continuous_monitoring",
+      "actions": [
+        {
+          "action_id": "1.1",
+          "action_type": "monitor_sources",
+          "sources": [
+            "linkedin",
+            "company_databases",
+            "industry_directories",
+            "web_scraping"
+          ],
+          "filters_applied": true,
+          "real_time": true
+        },
+        {
+          "action_id": "1.2",
+          "action_type": "validate_lead",
+          "validation_criteria": [
+            "company_size_match",
+            "keyword_relevance",
+            "contact_information_available"
+          ]
+        },
+        {
+          "action_id": "1.3",
+          "action_type": "store_lead",
+          "destination": "lead_database",
+          "status": "new_lead"
+        }
+      ],
+      "next_stage": 2,
+      "data_captured": [
+        "company_name",
+        "contact_name",
+        "contact_email",
+        "company_size",
+        "industry",
+        "website",
+        "linkedin_profile",
+        "capture_timestamp"
+      ]
+    },
+    
+    {
+      "stage_id": 2,
+      "stage_name": "Automated Company Research",
+      "description": "Gather publicly available information about the lead's company",
+      "trigger": "new_lead_captured",
+      "actions": [
+        {
+          "action_id": "2.1",
+          "action_type": "web_research",
+          "research_areas": [
+            "company_website",
+            "social_media_presence",
+            "recent_news",
+            "product_services",
+            "team_structure",
+            "growth_indicators",
+            "pain_points",
+            "competitor_analysis"
+          ],
+          "ai_analysis": true
+        },
+        {
+          "action_id": "2.2",
+          "action_type": "synthesize_insights",
+          "output": "research_summary",
+          "personalization_data_points": [
+            "relevant_challenges",
+            "growth_stage",
+            "key_initiatives",
+            "decision_maker_info"
+          ]
+        },
+        {
+          "action_id": "2.3",
+          "action_type": "update_lead_profile",
+          "status": "researched"
+        }
+      ],
+      "next_stage": 3,
+      "data_captured": [
+        "research_summary",
+        "personalization_insights",
+        "relevance_score",
+        "research_timestamp"
+      ]
+    },
+    
+    {
+      "stage_id": 3,
+      "stage_name": "Personalized Email Outreach",
+      "description": "Craft and send personalized initial outreach email",
+      "trigger": "research_completed",
+      "actions": [
+        {
+          "action_id": "3.1",
+          "action_type": "generate_email",
+          "personalization_elements": [
+            "company_specific_insights",
+            "relevant_pain_points",
+            "tailored_value_proposition",
+            "industry_context"
+          ],
+          "email_components": {
+            "subject_line": "personalized",
+            "greeting": "professional",
+            "body": {
+              "introduction": "brief_connection",
+              "company_insight": "show_research",
+              "value_proposition": "specific_benefits",
+              "call_to_action": "low_pressure"
+            },
+            "signature": "professional"
+          },
+          "tone": "professional_friendly"
+        },
+        {
+          "action_id": "3.2",
+          "action_type": "send_email",
+          "delivery_method": "smtp",
+          "tracking_enabled": true,
+          "track_metrics": [
+            "sent_timestamp",
+            "delivery_status",
+            "open_rate",
+            "click_rate"
+          ]
+        },
+        {
+          "action_id": "3.3",
+          "action_type": "update_status",
+          "status": "outreach_sent",
+          "next_action_trigger": "reply_monitoring"
+        }
+      ],
+      "next_stage": 4,
+      "data_captured": [
+        "email_content",
+        "sent_timestamp",
+        "delivery_status",
+        "tracking_id"
+      ]
+    },
+    
+    {
+      "stage_id": 4,
+      "stage_name": "Reply Monitoring & Sentiment Analysis",
+      "description": "Monitor incoming replies and analyze sentiment",
+      "trigger": "continuous_after_outreach",
+      "actions": [
+        {
+          "action_id": "4.1",
+          "action_type": "monitor_inbox",
+          "monitoring_frequency": "real_time",
+          "filter_by": "thread_id"
+        },
+        {
+          "action_id": "4.2",
+          "action_type": "analyze_sentiment",
+          "ai_analysis": true,
+          "sentiment_categories": [
+            "positive",
+            "neutral",
+            "negative",
+            "not_interested",
+            "auto_reply"
+          ],
+          "intent_detection": [
+            "interested",
+            "needs_more_info",
+            "wants_meeting",
+            "not_right_time",
+            "not_interested",
+            "unsubscribe"
+          ]
+        },
+        {
+          "action_id": "4.3",
+          "action_type": "route_response",
+          "routing_logic": {
+            "positive": "stage_5",
+            "negative": "stage_6",
+            "neutral": "stage_6",
+            "no_reply_after_days": {
+              "days": 2,
+              "route_to": "stage_6"
+            }
+          }
+        }
+      ],
+      "branching_logic": true,
+      "data_captured": [
+        "reply_timestamp",
+        "reply_content",
+        "sentiment_score",
+        "intent_classification",
+        "response_time"
+      ]
+    },
+    
+    {
+      "stage_id": 5,
+      "stage_name": "Positive Reply - Appointment Booking",
+      "description": "Send meeting invitation for positive responses",
+      "trigger": "positive_sentiment_detected",
+      "actions": [
+        {
+          "action_id": "5.1",
+          "action_type": "generate_meeting_invite",
+          "email_components": {
+            "subject_line": "Next Steps: Let's Schedule a Call",
+            "body": {
+              "thank_response": true,
+              "meeting_purpose": "discuss_collaboration",
+              "calendar_link": true,
+              "flexibility_note": true
+            }
+          }
+        },
+        {
+          "action_id": "5.2",
+          "action_type": "include_booking_link",
+          "calendar_integration": true,
+          "booking_options": {
+            "duration": "30_minutes",
+            "buffer_time": "24_hours",
+            "timezone_detection": true
+          }
+        },
+        {
+          "action_id": "5.3",
+          "action_type": "send_email",
+          "priority": "high"
+        },
+        {
+          "action_id": "5.4",
+          "action_type": "update_status",
+          "status": "meeting_invite_sent"
+        },
+        {
+          "action_id": "5.5",
+          "action_type": "monitor_booking",
+          "actions_on_booking": [
+            "send_confirmation",
+            "update_status_to_meeting_scheduled",
+            "add_to_crm"
+          ]
+        }
+      ],
+      "success_metrics": [
+        "meeting_booked",
+        "meeting_completed"
+      ],
+      "data_captured": [
+        "invite_sent_timestamp",
+        "booking_status",
+        "meeting_date_time",
+        "meeting_link"
+      ]
+    },
+    
+    {
+      "stage_id": 6,
+      "stage_name": "Follow-up Sequence",
+      "description": "Automated follow-up for negative or no replies",
+      "trigger": "negative_sentiment_or_no_reply",
+      "follow_up_schedule": [
+        {
+          "follow_up_id": 1,
+          "delay_days": 1,
+          "action_type": "send_followup_email",
+          "email_approach": "gentle_reminder",
+          "content_focus": [
+            "acknowledge_busy_schedule",
+            "reiterate_brief_value",
+            "ask_if_good_time"
+          ]
+        },
+        {
+          "follow_up_id": 2,
+          "delay_days": 2,
+          "action_type": "send_followup_email",
+          "email_approach": "different_angle",
+          "content_focus": [
+            "share_relevant_resource",
+            "case_study_or_insight",
+            "no_pressure_check_in"
+          ]
+        },
+        {
+          "follow_up_id": 3,
+          "delay_days": 3,
+          "action_type": "send_followup_email",
+          "email_approach": "final_value_offer",
+          "content_focus": [
+            "specific_benefit_highlight",
+            "limited_time_offer_if_applicable",
+            "easy_opt_out"
+          ]
+        },
+        {
+          "follow_up_id": 4,
+          "delay_days": 5,
+          "action_type": "send_closure_email",
+          "email_approach": "graceful_exit",
+          "content_focus": [
+            "thank_for_consideration",
+            "keep_door_open",
+            "remove_from_sequence",
+            "optional_feedback_request"
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "action_id": "6.1",
+          "action_type": "schedule_followups",
+          "scheduling_engine": "automated"
+        },
+        {
+          "action_id": "6.2",
+          "action_type": "monitor_responses",
+          "interrupt_sequence_on": [
+            "positive_reply",
+            "meeting_request",
+            "unsubscribe"
+          ]
+        },
+        {
+          "action_id": "6.3",
+          "action_type": "update_status_progression",
+          "status_updates": [
+            "followup_1_sent",
+            "followup_2_sent",
+            "followup_3_sent",
+            "sequence_completed"
+          ]
+        }
+      ],
+      "completion_actions": [
+        "mark_lead_as_unresponsive",
+        "archive_or_nurture_list",
+        "schedule_future_reactivation"
+      ],
+      "data_captured": [
+        "followup_timestamps",
+        "response_to_followup",
+        "sequence_completion_date",
+        "final_status"
+      ]
+    }
+  ],
+
+  "data_management": {
+    "spreadsheet_integration": {
+      "platform": "excel",
+      "update_frequency": "real_time",
+      "columns": [
+        {
+          "column_name": "Lead ID",
+          "data_type": "string",
+          "auto_generated": true
+        },
+        {
+          "column_name": "Capture Date",
+          "data_type": "datetime",
+          "format": "YYYY-MM-DD HH:MM:SS"
+        },
+        {
+          "column_name": "Company Name",
+          "data_type": "string"
+        },
+        {
+          "column_name": "Contact Name",
+          "data_type": "string"
+        },
+        {
+          "column_name": "Contact Email",
+          "data_type": "string"
+        },
+        {
+          "column_name": "Company Size",
+          "data_type": "integer"
+        },
+        {
+          "column_name": "Industry",
+          "data_type": "string"
+        },
+        {
+          "column_name": "Website",
+          "data_type": "url"
+        },
+        {
+          "column_name": "Research Summary",
+          "data_type": "text"
+        },
+        {
+          "column_name": "Current Stage",
+          "data_type": "string",
+          "values": [
+            "New Lead",
+            "Researched",
+            "Outreach Sent",
+            "Awaiting Reply",
+            "Positive Response",
+            "Meeting Invited",
+            "Meeting Scheduled",
+            "In Follow-up Sequence",
+            "Unresponsive",
+            "Not Interested",
+            "Qualified"
+          ]
+        },
+        {
+          "column_name": "Status",
+          "data_type": "string",
+          "values": [
+            "Active",
+            "On Hold",
+            "Closed Won",
+            "Closed Lost"
+          ]
+        },
+        {
+          "column_name": "Initial Outreach Date",
+          "data_type": "datetime"
+        },
+        {
+          "column_name": "Last Contact Date",
+          "data_type": "datetime"
+        },
+        {
+          "column_name": "Reply Received",
+          "data_type": "boolean"
+        },
+        {
+          "column_name": "Sentiment",
+          "data_type": "string",
+          "values": [
+            "Positive",
+            "Neutral",
+            "Negative",
+            "None"
+          ]
+        },
+        {
+          "column_name": "Follow-up Count",
+          "data_type": "integer"
+        },
+        {
+          "column_name": "Meeting Scheduled",
+          "data_type": "boolean"
+        },
+        {
+          "column_name": "Meeting Date",
+          "data_type": "datetime"
+        },
+        {
+          "column_name": "Communication History",
+          "data_type": "text",
+          "format": "json_array"
+        },
+        {
+          "column_name": "Notes",
+          "data_type": "text"
+        },
+        {
+          "column_name": "Last Updated",
+          "data_type": "datetime",
+          "auto_updated": true
+        }
+      ],
+      "automated_updates": [
+        "stage_changes",
+        "email_sent",
+        "reply_received",
+        "meeting_scheduled",
+        "sentiment_analysis",
+        "followup_triggers"
+      ]
+    }
+  },
+
+  "compliance_and_safety": {
+    "email_compliance": {
+      "gdpr_compliant": true,
+      "can_spam_compliant": true,
+      "unsubscribe_link": "required",
+      "sender_identification": "required",
+      "opt_out_processing": "automatic"
+    },
+    "rate_limiting": {
+      "max_emails_per_day": 100,
+      "delay_between_emails_seconds": 30,
+      "respect_time_zones": true,
+      "business_hours_only": true
+    },
+    "data_protection": {
+      "encryption": "required",
+      "data_retention_days": 730,
+      "anonymization_on_request": true,
+      "secure_storage": true
+    }
+  },
+
+  "reporting_and_analytics": {
+    "dashboard_metrics": [
+      "total_leads_captured",
+      "leads_by_stage",
+      "email_open_rate",
+      "email_reply_rate",
+      "positive_sentiment_rate",
+      "meetings_scheduled",
+      "conversion_rate",
+      "average_response_time",
+      "followup_effectiveness"
+    ],
+    "automated_reports": {
+      "frequency": "weekly",
+      "recipients": [],
+      "include_metrics": "all",
+      "format": "pdf_and_excel"
+    }
+  },
+
+  "ai_models": {
+    "lead_scoring": {
+      "model_type": "machine_learning",
+      "inputs": [
+        "company_size",
+        "industry",
+        "engagement_signals",
+        "research_insights"
+      ]
+    },
+    "email_generation": {
+      "model_type": "large_language_model",
+      "personalization_level": "high",
+      "tone_consistency": "enabled"
+    },
+    "sentiment_analysis": {
+      "model_type": "nlp",
+      "accuracy_threshold": 0.85,
+      "human_review_on_uncertainty": true
+    }
+  },
+
+  "integration_requirements": {
+    "required_integrations": [
+      "email_service_provider",
+      "calendar_api",
+      "spreadsheet_api",
+      "web_scraping_tools"
+    ],
+    "optional_integrations": [
+      "crm_system",
+      "linkedin_sales_navigator",
+      "company_database_apis",
+      "analytics_platform"
+    ]
+  }
+}
