@@ -1,0 +1,424 @@
+{
+  "agent_name": "Ready Launch Outreach Agent",
+  "version": "1.0",
+  
+  "credentials": {
+    "INSTRUCTIONS": "Fill in all credentials below. Keep this file secure and never share it publicly.",
+    "scraping": {
+      "NOTE": "Use free scrapers - Bright Data free tier, ScraperAPI free tier, or Apify free tier",
+      "scraper_api_key": "YOUR_FREE_SCRAPER_API_KEY_HERE",
+      "scraper_service": "scraperapi|brightdata|apify"
+    },
+    "email_finder": {
+      "snov_io_client_id": "YOUR_SNOV_IO_CLIENT_ID",
+      "snov_io_client_secret": "YOUR_SNOV_IO_CLIENT_SECRET",
+      "NOTE": "Get free tier from https://snov.io - 50 credits/month free"
+    },
+    "email_sending": {
+      "NOTE": "Use Gmail with App Password (free) or SendGrid free tier (100 emails/day)",
+      "service": "gmail|sendgrid",
+      "gmail_email": "YOUR_GMAIL@gmail.com",
+      "gmail_app_password": "YOUR_16_CHAR_APP_PASSWORD",
+      "sendgrid_api_key": "YOUR_SENDGRID_API_KEY"
+    },
+    "calendar": {
+      "google_calendar_id": "YOUR_CALENDAR_ID@gmail.com",
+      "google_calendar_link": "https://calendar.google.com/calendar/u/0/appointments/schedules/YOUR_BOOKING_LINK",
+      "NOTE": "Create free booking page at calendar.google.com"
+    },
+    "telegram": {
+      "bot_token": "YOUR_TELEGRAM_BOT_TOKEN",
+      "chat_id": "YOUR_TELEGRAM_CHAT_ID",
+      "NOTE": "Create free bot via @BotFather on Telegram"
+    }
+  },
+
+  "target_criteria": {
+    "company_size": "2-10 employees",
+    "role_keywords": [
+      "founder",
+      "co-founder",
+      "CEO",
+      "CTO",
+      "technical founder",
+      "product owner"
+    ],
+    "hiring_signals": [
+      "hiring software developer",
+      "looking for developers",
+      "need app development",
+      "building product",
+      "seeking full stack developer",
+      "recruiting engineers"
+    ],
+    "platforms": ["superlist", "linkedin", "glassdoor"]
+  },
+
+  "scraping_workflow": {
+    "step_1": {
+      "action": "scrape_job_listings",
+      "sources": [
+        {
+          "platform": "linkedin",
+          "search_query": "software developer hiring company:2-10 employees",
+          "filters": {
+            "company_size": "2-10",
+            "posted_within": "7 days"
+          }
+        },
+        {
+          "platform": "glassdoor",
+          "search_query": "software developer startup",
+          "filters": {
+            "company_size": "1-50"
+          }
+        }
+      ],
+      "extract_fields": [
+        "company_name",
+        "job_title",
+        "job_description",
+        "company_website",
+        "industry"
+      ]
+    },
+    "step_2": {
+      "action": "research_company",
+      "tasks": [
+        "Visit company website",
+        "Identify pain points from job description",
+        "Check if building product/app/platform",
+        "Verify company size (2-10 employees)",
+        "Find founder/decision maker names"
+      ]
+    },
+    "step_3": {
+      "action": "find_founder_email",
+      "method": "snov.io API",
+      "api_endpoint": "https://api.snov.io/v1/get-emails-from-names",
+      "fallback": "Hunter.io free tier (50 searches/month)"
+    }
+  },
+
+  "email_sequences": {
+    "initial_email": {
+      "day": 0,
+      "subject_templates": [
+        "Quick question about [COMPANY_NAME]'s development needs",
+        "Re: [JOB_TITLE] at [COMPANY_NAME]",
+        "Helping [COMPANY_NAME] build faster & cheaper"
+      ],
+      "body_template": "Hi [FOUNDER_NAME],\n\nI noticed [COMPANY_NAME] is [HIRING_SIGNAL]. I saw you're [PAIN_POINT_FROM_RESEARCH].\n\nAt Ready Launch, we specialize in exactly what you need:\n• [RELEVANT_SERVICE_1]\n• [RELEVANT_SERVICE_2]\n• [RELEVANT_SERVICE_3]\n\nWe recently built two products for clients:\n\n1. An immersive video experience tool using Sora AI - users upload photos and interact with characters like Krishna from Mahabharata. The result? A unique storytelling platform that's generating serious buzz.\n\n2. [Your second product - please add details]\n\nWhat makes us different: We deliver 10X faster with 10X lower costs than traditional agencies.\n\nGiven your focus on [THEIR_PRODUCT_GOAL], I'd love to show you how we can accelerate your product development.\n\nWould you be open to a 15-minute chat this week?\n\nBest,\n[YOUR_NAME]\nReady Launch",
+      "personalization_variables": [
+        "FOUNDER_NAME",
+        "COMPANY_NAME",
+        "HIRING_SIGNAL",
+        "PAIN_POINT_FROM_RESEARCH",
+        "RELEVANT_SERVICE_1",
+        "RELEVANT_SERVICE_2",
+        "RELEVANT_SERVICE_3",
+        "THEIR_PRODUCT_GOAL"
+      ]
+    },
+    
+    "follow_up_day_1": {
+      "day": 1,
+      "condition": "no_reply",
+      "subject": "Re: Quick question about [COMPANY_NAME]'s development needs",
+      "body_template": "Hi [FOUNDER_NAME],\n\nI wanted to share a quick case study:\n\nWe helped [CLIENT_TYPE] save $45,000 in development costs and launch 3 months earlier than planned. Their revenue increased by 230% in the first quarter.\n\nThe secret? Our streamlined development process and automation expertise.\n\nFor [COMPANY_NAME], we could:\n• [SPECIFIC_SOLUTION_1]\n• [SPECIFIC_SOLUTION_2]\n• Deliver in half the time of traditional agencies\n\nAre you available for a quick call tomorrow or Thursday?\n\nBest,\n[YOUR_NAME]"
+    },
+
+    "follow_up_day_3": {
+      "day": 3,
+      "condition": "no_reply",
+      "subject": "Last thought on [COMPANY_NAME]'s [PRODUCT_TYPE]",
+      "body_template": "Hi [FOUNDER_NAME],\n\nI know you're busy building [COMPANY_NAME], so I'll keep this brief.\n\nMost startups overspend on development by 300-500%. They also take 3-6 months longer than necessary.\n\nReady Launch specializes in:\n✓ Rapid MVP development\n✓ Full-stack web applications\n✓ Landing pages with conversion-optimized SEO\n✓ Custom automation to save hours daily\n\nWe've mastered the art of lean, fast execution.\n\nWould a 10-minute call make sense? Here's my calendar: [CALENDAR_LINK]\n\nBest,\n[YOUR_NAME]"
+    },
+
+    "follow_up_day_5": {
+      "day": 5,
+      "condition": "no_reply",
+      "subject": "Quick question - [FOUNDER_NAME]",
+      "body_template": "Hi [FOUNDER_NAME],\n\nI wanted to reach out one more time.\n\nIf the timing isn't right, no worries at all. But if you're still looking to [THEIR_GOAL], I'd love to help.\n\nOur clients typically see:\n• 60-70% cost reduction vs traditional agencies\n• 2-3x faster delivery times\n• Ongoing support and iterations\n\nWould love to chat: [CALENDAR_LINK]\n\nBest,\n[YOUR_NAME]\nReady Launch"
+    },
+
+    "follow_up_day_7": {
+      "day": 7,
+      "condition": "no_reply",
+      "subject": "Thank you + staying in touch",
+      "body_template": "Hi [FOUNDER_NAME],\n\nI don't want to clutter your inbox, so this will be my last email.\n\nThank you for your time, even if just reading these messages. I genuinely wish you the best with [COMPANY_NAME].\n\nIf your development needs change in the future, you know where to find us:\n• Website: [YOUR_WEBSITE]\n• Email: [YOUR_EMAIL]\n• Calendar: [CALENDAR_LINK]\n\nCheers to your success!\n\n[YOUR_NAME]\nReady Launch"
+    },
+
+    "conversion_email": {
+      "day": 0,
+      "trigger": "positive_reply",
+      "subject": "Re: [ORIGINAL_SUBJECT]",
+      "body_template": "Hi [FOUNDER_NAME],\n\nFantastic! I'm excited to discuss how Ready Launch can help [COMPANY_NAME].\n\nPlease book a time that works best for you here:\n[CALENDAR_LINK]\n\nI'll send over a prep questionnaire before our call so we can make the most of our time.\n\nLooking forward to it!\n\nBest,\n[YOUR_NAME]\nReady Launch\n\nP.S. Feel free to check out our previous work at [PORTFOLIO_LINK]"
+    }
+  },
+
+  "automation_logic": {
+    "daily_tasks": [
+      {
+        "time": "09:00",
+        "action": "scrape_new_leads",
+        "limit": 50
+      },
+      {
+        "time": "10:00",
+        "action": "research_leads",
+        "batch_size": 20
+      },
+      {
+        "time": "11:00",
+        "action": "find_emails",
+        "batch_size": 20
+      },
+      {
+        "time": "14:00",
+        "action": "send_initial_emails",
+        "batch_size": 30
+      },
+      {
+        "time": "15:00",
+        "action": "process_follow_ups",
+        "check_all_sequences": true
+      },
+      {
+        "time": "16:00",
+        "action": "check_replies",
+        "process_conversions": true
+      }
+    ],
+
+    "reply_detection": {
+      "check_frequency": "every_2_hours",
+      "positive_reply_keywords": [
+        "interested",
+        "yes",
+        "let's talk",
+        "tell me more",
+        "schedule",
+        "available",
+        "sounds good",
+        "call"
+      ],
+      "negative_reply_keywords": [
+        "not interested",
+        "no thanks",
+        "remove",
+        "unsubscribe",
+        "stop"
+      ]
+    },
+
+    "conversion_actions": {
+      "on_positive_reply": [
+        {
+          "action": "send_calendar_email",
+          "template": "conversion_email"
+        },
+        {
+          "action": "notify_telegram",
+          "message": "🎉 NEW LEAD CONVERTED!\n\nCompany: [COMPANY_NAME]\nFounder: [FOUNDER_NAME]\nEmail: [EMAIL]\nOriginal Message: [REPLY_TEXT]\n\nAction: Calendar link sent!"
+        },
+        {
+          "action": "update_crm",
+          "status": "converted"
+        }
+      ],
+      "on_calendar_booking": [
+        {
+          "action": "notify_telegram",
+          "message": "📅 MEETING BOOKED!\n\nCompany: [COMPANY_NAME]\nFounder: [FOUNDER_NAME]\nTime: [MEETING_TIME]\n\nPrepare for call!"
+        }
+      ]
+    }
+  },
+
+  "data_storage": {
+    "leads_database": {
+      "format": "json",
+      "location": "leads_db.json",
+      "fields": [
+        "lead_id",
+        "company_name",
+        "founder_name",
+        "founder_email",
+        "company_website",
+        "company_size",
+        "industry",
+        "hiring_signal",
+        "pain_points",
+        "date_added",
+        "email_sent_date",
+        "last_follow_up",
+        "follow_up_count",
+        "status",
+        "reply_received",
+        "conversion_date"
+      ]
+    }
+  },
+
+  "free_tools_setup": {
+    "STEP_1_SCRAPING": {
+      "option_1": {
+        "tool": "Bright Data Free Tier",
+        "url": "https://brightdata.com",
+        "limits": "Limited free requests",
+        "setup": "Sign up > Get API key > Add to credentials"
+      },
+      "option_2": {
+        "tool": "ScraperAPI Free Tier",
+        "url": "https://www.scraperapi.com",
+        "limits": "1000 requests/month free",
+        "setup": "Sign up > Copy API key > Add to credentials"
+      },
+      "option_3": {
+        "tool": "Apify Free Tier",
+        "url": "https://apify.com",
+        "limits": "$5 free credit monthly",
+        "setup": "Sign up > Create actor > Get token"
+      }
+    },
+    
+    "STEP_2_EMAIL_FINDER": {
+      "tool": "Snov.io Free Tier",
+      "url": "https://snov.io",
+      "limits": "50 credits/month free",
+      "setup": "Sign up > API > Get Client ID & Secret > Add to credentials"
+    },
+    
+    "STEP_3_EMAIL_SENDING": {
+      "option_1": {
+        "tool": "Gmail with App Password",
+        "cost": "100% FREE",
+        "limits": "500 emails/day",
+        "setup": [
+          "1. Go to myaccount.google.com",
+          "2. Security > 2-Step Verification (enable)",
+          "3. Security > App passwords",
+          "4. Generate password for 'Mail'",
+          "5. Copy 16-character password to credentials"
+        ]
+      },
+      "option_2": {
+        "tool": "SendGrid Free Tier",
+        "limits": "100 emails/day",
+        "setup": "Sign up > Settings > API Keys > Create > Add to credentials"
+      }
+    },
+    
+    "STEP_4_CALENDAR": {
+      "tool": "Google Calendar Appointment Schedules",
+      "cost": "100% FREE",
+      "setup": [
+        "1. Go to calendar.google.com",
+        "2. Click '+' > Appointment schedule",
+        "3. Set your availability",
+        "4. Copy booking link",
+        "5. Add link to credentials"
+      ]
+    },
+    
+    "STEP_5_TELEGRAM": {
+      "tool": "Telegram Bot",
+      "cost": "100% FREE",
+      "setup": [
+        "1. Open Telegram > Search @BotFather",
+        "2. Send /newbot",
+        "3. Follow prompts to create bot",
+        "4. Copy bot token",
+        "5. Start chat with your bot",
+        "6. Visit https://api.telegram.org/bot<TOKEN>/getUpdates",
+        "7. Copy your chat_id",
+        "8. Add both to credentials"
+      ]
+    },
+    
+    "STEP_6_HOSTING": {
+      "tool": "Python + Cron (Free Forever)",
+      "options": [
+        {
+          "service": "PythonAnywhere Free Tier",
+          "url": "https://www.pythonanywhere.com",
+          "limits": "1 scheduled task free",
+          "setup": "Upload Python script > Schedule daily task"
+        },
+        {
+          "service": "Google Cloud Free Tier",
+          "url": "https://cloud.google.com/free",
+          "limits": "Cloud Functions - 2M invocations/month free",
+          "setup": "Deploy Python function > Set Cloud Scheduler"
+        },
+        {
+          "service": "Local Machine",
+          "cost": "FREE",
+          "setup": "Run Python script > Use Windows Task Scheduler or Mac Cron"
+        }
+      ]
+    }
+  },
+
+  "python_implementation_guide": {
+    "required_libraries": [
+      "requests",
+      "beautifulsoup4",
+      "python-dotenv",
+      "schedule",
+      "smtplib (built-in)",
+      "json (built-in)"
+    ],
+    "install_command": "pip install requests beautifulsoup4 python-dotenv schedule",
+    
+    "file_structure": {
+      "main.py": "Main orchestration script",
+      "scraper.py": "Web scraping functions",
+      "email_finder.py": "Snov.io integration",
+      "email_sender.py": "Email sending logic",
+      "telegram_notifier.py": "Telegram notifications",
+      "config.json": "This configuration file",
+      "leads_db.json": "Database of leads (auto-generated)",
+      ".env": "Environment variables with credentials"
+    }
+  },
+
+  "execution_instructions": {
+    "COMPLETE_SETUP_GUIDE": [
+      "1. Install Python 3.8+ from python.org",
+      "2. Create project folder: ready_launch_agent",
+      "3. Save this JSON as 'config.json' in that folder",
+      "4. Fill in ALL credentials in the 'credentials' section above",
+      "5. Install libraries: pip install requests beautifulsoup4 python-dotenv schedule",
+      "6. Create main Python script (I can provide if needed)",
+      "7. Run script: python main.py",
+      "8. Agent will run continuously and handle everything automatically"
+    ],
+    
+    "IMPORTANT_NOTES": [
+      "⚠️ RATE LIMITS: Free tiers have limits. Agent will automatically respect them.",
+      "⚠️ DAILY SENDING: Start with 20-30 emails/day, scale up gradually",
+      "⚠️ EMAIL WARMUP: If using new Gmail, warm it up first (send manual emails for a week)",
+      "⚠️ LEGAL: Ensure compliance with CAN-SPAM Act and GDPR",
+      "⚠️ PERSONALIZATION: The more personalized, the better response rates"
+    ]
+  },
+
+  "estimated_costs": {
+    "setup_cost": "$0",
+    "monthly_cost": "$0",
+    "scaling_note": "Everything runs free until you exceed free tier limits. Then costs are minimal (~$10-20/month for 1000+ emails)"
+  },
+
+  "kpi_tracking": {
+    "metrics_to_monitor": {
+      "leads_scraped_daily": "Target: 50",
+      "emails_sent_daily": "Target: 30",
+      "open_rate": "Target: 40%+",
+      "reply_rate": "Target: 5%+",
+      "conversion_rate": "Target: 1-2%",
+      "meetings_booked": "Target: 5-10/month"
+    }
+  }
+}
