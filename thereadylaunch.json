@@ -1,0 +1,469 @@
+{
+  "name": "Ready Launch Outreach Agent - Fixed",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Daily Trigger - 9 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.scraperapi.com/",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "api_key",
+              "value": "YOUR_SCRAPER_API_KEY"
+            },
+            {
+              "name": "url",
+              "value": "https://www.linkedin.com/jobs/search/?keywords=software%20developer%20hiring&f_TPR=r86400"
+            },
+            {
+              "name": "render",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "scrape-jobs",
+      "name": "1. Scrape LinkedIn Job Posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "notesInFlow": true,
+      "notes": "Scrapes recent job postings from LinkedIn"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract company names and job URLs from LinkedIn HTML\nconst html = $input.first().json.body;\nconst companies = [];\n\n// Parse HTML to find company info and job links\n// This is a simplified version - adjust regex based on actual LinkedIn HTML structure\nconst companyPattern = /<span class=\"result-card__subtitle-link\"[^>]*>([^<]+)<\\/span>/gi;\nconst jobLinkPattern = /href=\"(https:\\/\\/www\\.linkedin\\.com\\/jobs\\/view\\/\\d+[^\"]*)\"/gi;\n\nlet companyMatch;\nlet linkMatch;\nconst companyNames = [];\nconst jobLinks = [];\n\nwhile ((companyMatch = companyPattern.exec(html)) !== null) {\n  companyNames.push(companyMatch[1].trim());\n}\n\nwhile ((linkMatch = jobLinkPattern.exec(html)) !== null) {\n  jobLinks.push(linkMatch[1]);\n}\n\n// Combine and create output (limit to 20 companies)\nfor (let i = 0; i < Math.min(companyNames.length, 20); i++) {\n  companies.push({\n    json: {\n      company_name: companyNames[i],\n      job_url: jobLinks[i] || '',\n      scraped_date: new Date().toISOString(),\n      status: 'scraped'\n    }\n  });\n}\n\nreturn companies;"
+      },
+      "id": "extract-companies",
+      "name": "2. Extract Companies & Job URLs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.scraperapi.com/?api_key=YOUR_API_KEY&url={{encodeURIComponent($json.job_url)}}&render=true",
+        "options": {}
+      },
+      "id": "scrape-job-page",
+      "name": "3. Scrape Individual Job Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "notesInFlow": true,
+      "notes": "Gets full job description to understand hiring needs"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract company website and hiring details from job page\nconst html = $input.first().json.body;\nconst previousData = $input.first().json;\n\n// Extract company website\nconst websiteMatch = html.match(/https?:\\/\\/(?:www\\.)?([a-zA-Z0-9-]+\\.[a-zA-Z]{2,})/i);\nconst companyWebsite = websiteMatch ? websiteMatch[0] : '';\n\n// Extract job description/requirements\nconst descMatch = html.match(/<div class=\"description[^>]*>([\\s\\S]*?)<\\/div>/i);\nconst jobDescription = descMatch ? descMatch[1].replace(/<[^>]*>/g, '').substring(0, 500) : '';\n\nreturn [{\n  json: {\n    ...previousData,\n    company_website: companyWebsite,\n    job_description: jobDescription,\n    company_domain: companyWebsite.replace(/https?:\\/\\/(www\\.)?/, '').split('/')[0]\n  }\n}];"
+      },
+      "id": "extract-details",
+      "name": "4. Extract Company Website & Details",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.snov.io/v1/get-domain-emails-with-info",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "snovIoApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "domain",
+              "value": "={{$json.company_domain}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "find-emails-snov",
+      "name": "5. Find Founder Email (Snov.io)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 300],
+      "notesInFlow": true,
+      "notes": "Uses Snov.io to find verified emails from company domain"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter to get founder/CEO emails only\nconst emailData = $input.first().json;\nconst previousData = $input.first().json;\nconst founderKeywords = ['founder', 'ceo', 'cto', 'co-founder', 'chief executive', 'owner'];\n\nif (!emailData.emails || emailData.emails.length === 0) {\n  return []; // Skip if no emails found\n}\n\n// Find founder email\nlet founderEmail = emailData.emails.find(email => {\n  const position = (email.position || '').toLowerCase();\n  return founderKeywords.some(keyword => position.includes(keyword));\n});\n\n// Fallback: if no founder found, take first email\nif (!founderEmail && emailData.emails.length > 0) {\n  founderEmail = emailData.emails[0];\n}\n\nif (founderEmail && founderEmail.email) {\n  return [{\n    json: {\n      company_name: previousData.company_name,\n      company_website: previousData.company_website,\n      job_description: previousData.job_description,\n      founder_name: `${founderEmail.firstName || ''} ${founderEmail.lastName || ''}`.trim() || 'there',\n      founder_email: founderEmail.email,\n      founder_position: founderEmail.position || 'Founder',\n      scraped_date: previousData.scraped_date\n    }\n  }];\n}\n\nreturn []; // Skip if no valid email"
+      },
+      "id": "filter-founder",
+      "name": "6. Filter & Format Founder Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.scraperapi.com/?api_key=YOUR_API_KEY&url={{encodeURIComponent($json.company_website)}}&render=true",
+        "options": {}
+      },
+      "id": "scrape-company-site",
+      "name": "7A. Deep Research - Company Website",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 200],
+      "notesInFlow": true,
+      "notes": "Scrapes company website for deep insights"
+    },
+    {
+      "parameters": {
+        "url": "=https://www.linkedin.com/company/{{$json.company_name.toLowerCase().replace(/\s+/g, '-')}}/about/",
+        "options": {}
+      },
+      "id": "scrape-linkedin-company",
+      "name": "7B. Research LinkedIn Company Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 300],
+      "notesInFlow": true,
+      "notes": "Gets company info from LinkedIn"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine all research data for AI analysis\nconst previousData = $input.item(0).json;\nconst websiteData = $input.item(1)?.json?.body || '';\nconst linkedInData = $input.item(2)?.json?.body || '';\n\n// Extract text content from HTML (remove tags)\nconst cleanText = (html) => {\n  return html.replace(/<script[^>]*>.*?<\\/script>/gi, '')\n             .replace(/<style[^>]*>.*?<\\/style>/gi, '')\n             .replace(/<[^>]+>/g, ' ')\n             .replace(/\\s+/g, ' ')\n             .trim()\n             .substring(0, 3000); // Limit to 3000 chars\n};\n\nconst websiteText = cleanText(websiteData);\nconst linkedInText = cleanText(linkedInData);\n\nreturn [{\n  json: {\n    ...previousData,\n    website_content: websiteText,\n    linkedin_content: linkedInText\n  }\n}];"
+      },
+      "id": "combine-research",
+      "name": "7C. Combine All Research Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, 400]
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "YOUR_GEMINI_API_KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You are an expert business analyst researching a company for a highly personalized sales outreach.\\n\\nCOMPANY INFORMATION:\\n- Company Name: {{$json.company_name}}\\n- Founder: {{$json.founder_name}}\\n- Position: {{$json.founder_position}}\\n- Job They Posted: {{$json.job_description}}\\n- Website Content: {{$json.website_content}}\\n- LinkedIn Info: {{$json.linkedin_content}}\\n\\nYOUR TASK:\\nAnalyze this company deeply as if you've researched them for hours. Identify:\\n\\n1. SPECIFIC PAIN POINTS (3-5 points):\\n   - What problems are they facing right now?\\n   - Where are they wasting time/money?\\n   - What's blocking their growth?\\n\\n2. AUTOMATION OPPORTUNITIES (2-3 specific ones):\\n   - What manual processes can we automate?\\n   - What repetitive tasks are eating their time?\\n\\n3. PERFORMANCE GAPS (2-3 areas):\\n   - Where is their website/product underperforming?\\n   - What's missing in their current setup?\\n   - What competitors are doing better?\\n\\n4. COST-CUTTING OPPORTUNITIES:\\n   - Where are they overspending on development?\\n   - How can an MVP approach save them money?\\n\\n5. SCALABILITY ISSUES:\\n   - What will break as they grow?\\n   - What technical debt are they building?\\n\\nOUR SOLUTION (Ready Launch):\\n- We build scalable MVPs in WEEKS, not months\\n- 10X cost reduction vs premium agencies\\n- Built products: Sora AI video tool (Krishna-Mahabharata experience), [other products]\\n- Specialize in: Full-stack apps, automation, landing pages, AI integration, rapid prototyping\\n\\nOUTPUT FORMAT (JSON ONLY):\\n{\\n  \\\"pain_points\\\": [\\\"specific pain 1\\\", \\\"pain 2\\\", \\\"pain 3\\\"],\\n  \\\"automation_needs\\\": [\\\"automation 1\\\", \\\"automation 2\\\"],\\n  \\\"performance_gaps\\\": [\\\"gap 1\\\", \\\"gap 2\\\"],\\n  \\\"cost_cutting_potential\\\": \\\"specific cost-cutting opportunity\\\",\\n  \\\"scalability_concerns\\\": [\\\"concern 1\\\", \\\"concern 2\\\"],\\n  \\\"our_solution_fit\\\": \\\"how Ready Launch specifically solves their problems\\\",\\n  \\\"personalized_hook\\\": \\\"compelling opening line for email mentioning specific pain point\\\"\\n}\\n\\nBe SPECIFIC. Use actual details from their website/job post. Make it feel like we've studied them for hours. NO GENERIC STATEMENTS.\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.7,\n    \"maxOutputTokens\": 1000\n  }\n}",
+        "options": {}
+      },
+      "id": "ai-deep-research",
+      "name": "7D. AI Deep Research (Gemini)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 500],
+      "notesInFlow": true,
+      "notes": "Gemini AI analyzes all data and creates personalized insights"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Gemini AI response and extract insights\nconst geminiResponse = $input.first().json;\nconst previousData = $input.first().json;\n\nlet aiInsights = {};\n\ntry {\n  // Gemini returns response in candidates[0].content.parts[0].text\n  const responseText = geminiResponse.candidates[0].content.parts[0].text;\n  \n  // Extract JSON from response (remove markdown code blocks if present)\n  const jsonMatch = responseText.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    aiInsights = JSON.parse(jsonMatch[0]);\n  }\n} catch (error) {\n  // Fallback if AI parsing fails\n  aiInsights = {\n    pain_points: ['scaling development team', 'time-to-market pressure', 'budget constraints'],\n    automation_needs: ['manual deployment processes', 'repetitive admin tasks'],\n    performance_gaps: ['slow website load times', 'poor mobile experience'],\n    cost_cutting_potential: 'MVP approach could save 60-70% vs full build',\n    scalability_concerns: ['current architecture won\\'t scale', 'technical debt accumulation'],\n    our_solution_fit: 'Ready Launch can build scalable MVP in 4-6 weeks at fraction of agency cost',\n    personalized_hook: `I noticed ${previousData.company_name} is hiring developers`\n  };\n}\n\nreturn [{\n  json: {\n    ...previousData,\n    ai_pain_points: aiInsights.pain_points || [],\n    ai_automation_needs: aiInsights.automation_needs || [],\n    ai_performance_gaps: aiInsights.performance_gaps || [],\n    ai_cost_cutting: aiInsights.cost_cutting_potential || '',\n    ai_scalability: aiInsights.scalability_concerns || [],\n    ai_solution_fit: aiInsights.our_solution_fit || '',\n    ai_hook: aiInsights.personalized_hook || ''\n  }\n}];"
+      },
+      "id": "parse-ai-insights",
+      "name": "7E. Parse AI Insights",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, 600]
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "YOUR_GEMINI_API_KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"Write a highly personalized cold outreach email for Ready Launch.\\n\\nRECIPIENT INFO:\\n- Name: {{$json.founder_name}}\\n- Company: {{$json.company_name}}\\n- Position: {{$json.founder_position}}\\n\\nRESEARCH INSIGHTS:\\n- Pain Points: {{JSON.stringify($json.ai_pain_points)}}\\n- Automation Needs: {{JSON.stringify($json.ai_automation_needs)}}\\n- Performance Gaps: {{JSON.stringify($json.ai_performance_gaps)}}\\n- Cost-Cutting Potential: {{$json.ai_cost_cutting}}\\n- Scalability Concerns: {{JSON.stringify($json.ai_scalability)}}\\n- Opening Hook: {{$json.ai_hook}}\\n\\nREADY LAUNCH VALUE PROPS:\\n- Build scalable MVPs in WEEKS not months\\n- 10X cost reduction vs premium agencies (agencies charge $50k-200k, we charge $5k-20k)\\n- Recent work: Sora AI-powered video tool where users upload photos and interact with Krishna from Mahabharata\\n- Services: Full-stack apps, automation, landing pages + SEO, AI integration, rapid prototyping\\n- Focus: Help startups launch fast and cheap, then iterate\\n\\nEMAIL REQUIREMENTS:\\n1. Start with the personalized hook mentioning SPECIFIC pain point\\n2. Show we've researched them (mention 2-3 specific things about their company)\\n3. Present OUR solution to THEIR specific problems\\n4. Mention cost savings with specific numbers (save $40k-150k, launch 3-6 months faster)\\n5. Social proof: mention our Sora AI product\\n6. One specific automation/performance improvement we can do for them\\n7. Clear CTA: 15-min call\\n8. Keep it under 200 words\\n9. Sound human, conversational, not salesy\\n10. Make it feel like we spent hours researching them\\n\\nTONE: Confident but humble, helpful not pushy, specific not generic.\\n\\nWrite ONLY the email body (no subject line). Use HTML formatting (<strong>, <br>, bullet points).\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.8,\n    \"maxOutputTokens\": 800\n  }\n}",
+        "options": {}
+      },
+      "id": "ai-write-email",
+      "name": "7F. AI Writes Personalized Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 700],
+      "notesInFlow": true,
+      "notes": "Gemini crafts the perfect personalized email"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract the AI-generated email\nconst geminiResponse = $input.first().json;\nconst previousData = $input.first().json;\n\nlet emailBody = '';\n\ntry {\n  emailBody = geminiResponse.candidates[0].content.parts[0].text;\n  // Clean up any markdown or extra formatting\n  emailBody = emailBody.replace(/```html\\n?/g, '').replace(/```\\n?/g, '').trim();\n} catch (error) {\n  // Fallback email if AI fails\n  emailBody = `Hi ${previousData.founder_name},<br><br>\n  \n  ${previousData.ai_hook}.<br><br>\n  \n  I spent some time researching ${previousData.company_name} and noticed you're facing ${previousData.ai_pain_points[0]}. This is exactly what we solve at Ready Launch.<br><br>\n  \n  <strong>Here's what we can do for you:</strong><br>\n  • Build your MVP in 4-6 weeks (not 6 months)<br>\n  • Save $40,000-$150,000 vs traditional agencies<br>\n  • ${previousData.ai_automation_needs[0]}<br><br>\n  \n  We recently built a Sora AI-powered video tool where users interact with Krishna from Mahabharata - delivered in 5 weeks at 1/10th the quoted agency price.<br><br>\n  \n  Given your focus on ${previousData.ai_solution_fit}, I'd love to show you how we can accelerate your product launch while cutting costs dramatically.<br><br>\n  \n  Open to a quick 15-min chat this week?<br><br>\n  \n  Best regards,<br>\n  [Your Name]<br>\n  <strong>Ready Launch</strong>`;\n}\n\nreturn [{\n  json: {\n    ...previousData,\n    personalized_email_body: emailBody\n  }\n}];"
+      },
+      "id": "extract-email",
+      "name": "7G. Extract Final Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, 800]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "resource": "message",
+        "fromEmail": "your-email@gmail.com",
+        "toEmail": "={{$json.founder_email}}",
+        "subject": "=Quick question about {{$json.company_name}}'s development needs",
+        "emailType": "html",
+        "message": "={{$json.personalized_email_body}}",
+        "options": {}
+      },
+      "id": "send-email",
+      "name": "8. Send AI-Personalized Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [2000, 800],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      },
+      "notesInFlow": true,
+      "notes": "Sends the deeply personalized email crafted by AI"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Ready Launch CRM"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "company_name": "={{$json.company_name}}",
+            "founder_name": "={{$json.founder_name}}",
+            "founder_email": "={{$json.founder_email}}",
+            "founder_position": "={{$json.founder_position}}",
+            "company_website": "={{$json.company_website}}",
+            "email_sent_date": "={{new Date().toISOString()}}",
+            "status": "initial_sent",
+            "follow_up_count": "0",
+            "last_contact": "={{new Date().toISOString()}}",
+            "pain_point": "={{$json.pain_point}}"
+          },
+          "matchingColumns": ["founder_email"],
+          "schema": [
+            {"id": "company_name", "displayName": "company_name", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "founder_name", "displayName": "founder_name", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "founder_email", "displayName": "founder_email", "required": false, "defaultMatch": true, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "founder_position", "displayName": "founder_position", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "company_website", "displayName": "company_website", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "email_sent_date", "displayName": "email_sent_date", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "status", "displayName": "status", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "follow_up_count", "displayName": "follow_up_count", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "last_contact", "displayName": "last_contact", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "pain_point", "displayName": "pain_point", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true}
+          ]
+        },
+        "options": {}
+      },
+      "id": "save-to-sheets",
+      "name": "9. Save to Google Sheets CRM",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2220, 300]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 */4 * * *"
+            }
+          ]
+        }
+      },
+      "id": "reply-check-trigger",
+      "name": "Check Replies Every 4 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 600]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 50,
+        "filters": {
+          "q": "is:unread in:inbox"
+        }
+      },
+      "id": "check-gmail",
+      "name": "10. Check Gmail for Replies",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [460, 600]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Detect positive replies\nconst positiveKeywords = [\n  'interested', 'yes', \"let's talk\", 'tell me more', \n  'schedule', 'available', 'sounds good', 'call',\n  'meeting', 'chat', 'discuss', 'open to'\n];\n\nconst results = [];\n\nfor (const item of $input.all()) {\n  const emailBody = (item.json.snippet || '').toLowerCase();\n  const subject = (item.json.subject || '').toLowerCase();\n  const from = item.json.from || '';\n  \n  const isPositive = positiveKeywords.some(keyword => \n    emailBody.includes(keyword) || subject.includes(keyword)\n  );\n  \n  if (isPositive) {\n    results.push({\n      json: {\n        ...item.json,\n        reply_type: 'positive',\n        from_email: from.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\\.[a-zA-Z0-9_-]+)/)?.[0] || from\n      }\n    });\n  }\n}\n\nreturn results;"
+      },
+      "id": "detect-positive",
+      "name": "11. Detect Positive Replies",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 600]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "resource": "message",
+        "fromEmail": "your-email@gmail.com",
+        "toEmail": "={{$json.from_email}}",
+        "subject": "=Re: {{$json.subject}}",
+        "emailType": "html",
+        "message": "=Hi,\n\nFantastic! I'm excited to discuss how Ready Launch can help.\n\n<strong>Please book a time that works best for you here:</strong><br>\n<a href=\"YOUR_CALENDAR_LINK\">📅 Book a 15-minute call</a>\n\nI'll send over a quick prep questionnaire before our call so we can make the most of our time together.\n\nLooking forward to it!\n\nBest regards,<br>\n[Your Name]<br>\nReady Launch\n\nP.S. Feel free to check out our previous work at [YOUR_PORTFOLIO_LINK]",
+        "options": {}
+      },
+      "id": "send-calendar",
+      "name": "12. Send Calendar Link",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [900, 600]
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=🎉 <strong>NEW LEAD CONVERTED!</strong>\n\n<strong>From:</strong> {{$json.from_email}}\n<strong>Subject:</strong> {{$json.subject}}\n\n<strong>Message Preview:</strong>\n{{$json.snippet}}\n\n✅ <strong>Action Taken:</strong> Calendar link sent automatically!\n\n👉 Follow up and prepare for the call!",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "notify-telegram",
+      "name": "13. Notify on Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1120, 600],
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Daily Trigger - 9 AM": {
+      "main": [[{"node": "1. Scrape LinkedIn Job Posts", "type": "main", "index": 0}]]
+    },
+    "1. Scrape LinkedIn Job Posts": {
+      "main": [[{"node": "2. Extract Companies & Job URLs", "type": "main", "index": 0}]]
+    },
+    "2. Extract Companies & Job URLs": {
+      "main": [[{"node": "3. Scrape Individual Job Page", "type": "main", "index": 0}]]
+    },
+    "3. Scrape Individual Job Page": {
+      "main": [[{"node": "4. Extract Company Website & Details", "type": "main", "index": 0}]]
+    },
+    "4. Extract Company Website & Details": {
+      "main": [[{"node": "5. Find Founder Email (Snov.io)", "type": "main", "index": 0}]]
+    },
+    "5. Find Founder Email (Snov.io)": {
+      "main": [[{"node": "6. Filter & Format Founder Data", "type": "main", "index": 0}]]
+    },
+    "6. Filter & Format Founder Data": {
+      "main": [[{"node": "7A. Deep Research - Company Website", "type": "main", "index": 0}]]
+    },
+    "7A. Deep Research - Company Website": {
+      "main": [[{"node": "7C. Combine All Research Data", "type": "main", "index": 0}]]
+    },
+    "7B. Research LinkedIn Company Page": {
+      "main": [[{"node": "7C. Combine All Research Data", "type": "main", "index": 1}]]
+    },
+    "7C. Combine All Research Data": {
+      "main": [[{"node": "7D. AI Deep Research (Gemini)", "type": "main", "index": 0}]]
+    },
+    "7D. AI Deep Research (Gemini)": {
+      "main": [[{"node": "7E. Parse AI Insights", "type": "main", "index": 0}]]
+    },
+    "7E. Parse AI Insights": {
+      "main": [[{"node": "7F. AI Writes Personalized Email", "type": "main", "index": 0}]]
+    },
+    "7F. AI Writes Personalized Email": {
+      "main": [[{"node": "7G. Extract Final Email", "type": "main", "index": 0}]]
+    },
+    "7G. Extract Final Email": {
+      "main": [[{"node": "8. Send AI-Personalized Email", "type": "main", "index": 0}]]
+    },
+    "8. Send AI-Personalized Email": {
+      "main": [[{"node": "9. Save to Google Sheets CRM", "type": "main", "index": 0}]]
+    },
+    "Check Replies Every 4 Hours": {
+      "main": [[{"node": "10. Check Gmail for Replies", "type": "main", "index": 0}]]
+    },
+    "10. Check Gmail for Replies": {
+      "main": [[{"node": "11. Detect Positive Replies", "type": "main", "index": 0}]]
+    },
+    "11. Detect Positive Replies": {
+      "main": [[{"node": "12. Send Calendar Link", "type": "main", "index": 0}]]
+    },
+    "12. Send Calendar Link": {
+      "main": [[{"node": "13. Notify on Telegram", "type": "main", "index": 0}]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-10-19T00:00:00.000Z"
+}
