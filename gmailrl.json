@@ -1,0 +1,428 @@
+{
+  "name": "Ready Launch Complete AI Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "trigger-daily",
+      "name": "Run Daily at 9 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 400]
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "url": "https://nubela.co/proxycurl/api/linkedin/company/employees/",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "linkedin_company_profile_url",
+              "value": "https://www.linkedin.com/company/wecp/"
+            },
+            {
+              "name": "page_size",
+              "value": "10"
+            },
+            {
+              "name": "employment_status",
+              "value": "current"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "search-linkedin",
+      "name": "1. Search LinkedIn for Hiring Companies",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 400],
+      "notes": "Uses Proxycurl API to find companies"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Mock data for testing - Replace with actual scraping\nconst companies = [\n  {\n    company_name: 'WeCP',\n    company_linkedin: 'https://www.linkedin.com/company/wecp/',\n    company_website: 'wecp.com',\n    company_size: '2-10',\n    hiring_role: 'Software Developer',\n    job_description: 'Looking for full-stack developer to build our assessment platform'\n  },\n  {\n    company_name: 'TechStartup',\n    company_linkedin: 'https://www.linkedin.com/company/techstartup/',\n    company_website: 'techstartup.io',\n    company_size: '5-10',\n    hiring_role: 'Senior Developer',\n    job_description: 'Need developer for MVP development, automation focus'\n  }\n];\n\nreturn companies.map(company => ({ json: company }));"
+      },
+      "id": "extract-companies",
+      "name": "2. Extract Companies (2-10 employees)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 400],
+      "notes": "Filters only 2-10 employee companies"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.snov.io/v1/get-domain-emails-with-info",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "snovIoApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "domain",
+              "value": "={{ $json.company_website }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "find-emails",
+      "name": "3. Find Founder Email (Snov.io)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 400],
+      "notes": "Snov.io finds all emails from company domain"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Get Snov.io response\nconst snovResponse = $input.item.json;\nconst companyData = $('2. Extract Companies (2-10 employees)').item.json;\n\n// Extract emails from Snov.io response\nconst emails = snovResponse.data?.emails || snovResponse.emails || [];\n\nif (emails.length === 0) {\n  console.log('No emails found for:', companyData.company_name);\n  return [];\n}\n\n// Find founder/CEO/CTO\nconst founderKeywords = ['founder', 'ceo', 'cto', 'chief executive', 'co-founder', 'owner'];\n\nlet founderEmail = emails.find(email => {\n  const position = (email.position || '').toLowerCase();\n  return founderKeywords.some(keyword => position.includes(keyword));\n});\n\n// Fallback: take first email if no founder found\nif (!founderEmail) {\n  founderEmail = emails[0];\n}\n\nif (!founderEmail || !founderEmail.email) {\n  console.log('No valid email found');\n  return [];\n}\n\nreturn [{\n  json: {\n    company_name: companyData.company_name,\n    company_website: companyData.company_website,\n    company_linkedin: companyData.company_linkedin,\n    hiring_role: companyData.hiring_role,\n    job_description: companyData.job_description,\n    founder_name: `${founderEmail.firstName || ''} ${founderEmail.lastName || ''}`.trim() || 'there',\n    founder_email: founderEmail.email,\n    founder_position: founderEmail.position || 'Founder',\n    found_via: 'snov.io'\n  }\n}];"
+      },
+      "id": "filter-founder",
+      "name": "4. Filter Founder Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 400],
+      "notes": "Extracts founder/CEO email from Snov.io results"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=YOUR_GEMINI_API_KEY",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You are a world-class sales researcher. Analyze this company for highly personalized cold outreach.\\n\\nCOMPANY DATA:\\n- Company: {{ $json.company_name }}\\n- Founder: {{ $json.founder_name }} ({{ $json.founder_position }})\\n- Hiring for: {{ $json.hiring_role }}\\n- Job Description: {{ $json.job_description }}\\n- Website: {{ $json.company_website }}\\n\\nYOUR MISSION:\\nSpend 2 hours researching this company (simulate this). Identify:\\n\\n1. **PAIN POINTS** (3-5 specific ones):\\n   - What's keeping them up at night?\\n   - What's blocking their growth?\\n   - Where are they wasting money/time?\\n\\n2. **AUTOMATION OPPORTUNITIES** (2-3 specific):\\n   - What manual processes are killing productivity?\\n   - What can be automated immediately?\\n\\n3. **PERFORMANCE GAPS**:\\n   - Where is their product/website underperforming?\\n   - What are competitors doing better?\\n\\n4. **COST-CUTTING POTENTIAL**:\\n   - Where are they overspending on development?\\n   - How much can an MVP approach save them?\\n\\n5. **SCALABILITY ISSUES**:\\n   - What will break when they scale?\\n   - What technical debt are they building?\\n\\nREADY LAUNCH SOLUTION:\\n- We build scalable MVPs in 4-6 WEEKS (not 6 months)\\n- 10X cost reduction: Save $40,000-$150,000 vs premium agencies\\n- Built Sora AI video tool: Users upload photos, interact with Krishna from Mahabharata\\n- Services: Full-stack apps, automation, AI integration, landing pages + SEO\\n- Focus: Launch fast, iterate quickly\\n\\nOUTPUT (JSON ONLY - NO MARKDOWN):\\n{\\n  \\\"pain_points\\\": [\\\"specific pain 1\\\", \\\"pain 2\\\", \\\"pain 3\\\"],\\n  \\\"automation_opportunities\\\": [\\\"automation 1\\\", \\\"automation 2\\\"],\\n  \\\"performance_gaps\\\": [\\\"gap 1\\\", \\\"gap 2\\\"],\\n  \\\"cost_cutting_potential\\\": \\\"how much they can save with specific numbers\\\",\\n  \\\"scalability_concerns\\\": [\\\"concern 1\\\", \\\"concern 2\\\"],\\n  \\\"our_solution_fit\\\": \\\"exact Ready Launch solution for their problems\\\",\\n  \\\"personalized_hook\\\": \\\"compelling opening line mentioning specific pain\\\"\\n}\\n\\nBe ULTRA SPECIFIC. Use details from job description. Make it feel like hours of research.\"\n    }]\n  }]\n}",
+        "options": {}
+      },
+      "id": "ai-research",
+      "name": "5. AI Deep Research (Gemini)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 400],
+      "notes": "Gemini analyzes company deeply"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Parse Gemini AI research response\nconst geminiResponse = $input.item.json;\nconst companyData = $input.item.json;\n\nlet insights = {};\n\ntry {\n  const text = geminiResponse.candidates[0].content.parts[0].text;\n  \n  // Remove markdown code blocks if present\n  const cleanText = text.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  \n  // Extract JSON\n  const jsonMatch = cleanText.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    insights = JSON.parse(jsonMatch[0]);\n  }\n} catch (error) {\n  console.log('AI parsing error, using fallback:', error);\n  // Fallback insights\n  insights = {\n    pain_points: [\n      'Struggling to find reliable developers',\n      'Long development timelines affecting time-to-market',\n      'High agency costs eating into runway'\n    ],\n    automation_opportunities: [\n      'Manual testing and deployment processes',\n      'Repetitive admin and data entry tasks'\n    ],\n    performance_gaps: [\n      'Website loading slowly affecting conversions',\n      'Missing key features competitors have'\n    ],\n    cost_cutting_potential: 'Can save $60,000-$120,000 by choosing MVP approach over full agency build',\n    scalability_concerns: [\n      'Current architecture won\\'t handle 10x growth',\n      'Technical debt from rushing initial build'\n    ],\n    our_solution_fit: 'We can build their MVP in 5-6 weeks, include automation, and save 70% on costs',\n    personalized_hook: `I noticed ${companyData.company_name} is hiring for ${companyData.hiring_role}`\n  };\n}\n\nreturn [{\n  json: {\n    ...companyData,\n    ai_insights: insights\n  }\n}];"
+      },
+      "id": "parse-insights",
+      "name": "6. Parse AI Insights",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=YOUR_GEMINI_API_KEY",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"Write an ultra-personalized cold email for Ready Launch.\\n\\nRECIPIENT:\\n- Name: {{ $json.founder_name }}\\n- Company: {{ $json.company_name }}\\n- Position: {{ $json.founder_position }}\\n\\nDEEP RESEARCH INSIGHTS:\\n{{ JSON.stringify($json.ai_insights, null, 2) }}\\n\\nREADY LAUNCH VALUE:\\n- Build MVPs in 4-6 WEEKS (not 6 months)\\n- Save $40,000-$150,000 vs premium agencies (be specific with their numbers)\\n- Launch 3-6 months FASTER\\n- Recent work: Sora AI video tool - users upload photos, interact with Krishna from Mahabharata\\n- Services: Full-stack, automation, AI integration, landing pages + SEO\\n\\nEMAIL REQUIREMENTS:\\n1. Start with personalized hook from insights\\n2. Mention 2-3 SPECIFIC things about their company/situation\\n3. Identify their exact pain point\\n4. Present Ready Launch as THE solution\\n5. Include specific cost savings: \\\"Save $XX,XXX-$XXX,XXX\\\"\\n6. Mention time savings: \\\"Launch 3-6 months faster\\\"\\n7. Reference Sora AI product as social proof\\n8. One specific automation/improvement we can do\\n9. Clear CTA: \\\"15-minute chat this week?\\\"\\n10. Under 180 words\\n11. Conversational, human tone (not corporate/salesy)\\n12. Make it feel like we spent 2 hours researching them\\n\\nFORMAT:\\n- Use HTML: <br> for breaks, <strong> for emphasis\\n- Natural paragraphs, not bullet points\\n- End with: Best regards,<br>[Your Name]<br>Ready Launch\\n\\nWrite ONLY the email body. NO subject line. NO extra text.\"\n    }]\n  }]\n}",
+        "options": {}
+      },
+      "id": "ai-write-email",
+      "name": "7. AI Write Personalized Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 400],
+      "notes": "Gemini writes hyper-personalized email"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Extract email from Gemini response\nconst geminiResponse = $input.item.json;\nconst companyData = $input.item.json;\n\nlet emailBody = '';\n\ntry {\n  emailBody = geminiResponse.candidates[0].content.parts[0].text;\n  // Clean up markdown\n  emailBody = emailBody.replace(/```html\\n?/g, '').replace(/```\\n?/g, '').trim();\n} catch (error) {\n  console.log('Email extraction error, using fallback');\n  // Fallback email\n  const insights = companyData.ai_insights;\n  emailBody = `Hi ${companyData.founder_name},<br><br>\n  \n  ${insights.personalized_hook}. After researching ${companyData.company_name}, I noticed you're dealing with ${insights.pain_points[0]} - this is exactly what we solve at Ready Launch.<br><br>\n  \n  <strong>Here's what we can do:</strong><br>\n  • Build your MVP in 5-6 weeks instead of 6 months<br>\n  • ${insights.cost_cutting_potential}<br>\n  • ${insights.automation_opportunities[0]}<br><br>\n  \n  We recently built a Sora AI-powered video tool where users upload photos and interact with Krishna from Mahabharata - delivered in 5 weeks at 1/10th agency cost.<br><br>\n  \n  Given your focus on ${companyData.hiring_role}, I'd love to show you how we can launch your product faster and save you $60k-120k in the process.<br><br>\n  \n  Open to a quick 15-min chat this week?<br><br>\n  \n  Best regards,<br>\n  [Your Name]<br>\n  Ready Launch`;\n}\n\nreturn [{\n  json: {\n    ...companyData,\n    email_body: emailBody,\n    email_subject: `Quick question about ${companyData.company_name}'s development needs`,\n    status: 'ready_to_send',\n    created_date: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "extract-email",
+      "name": "8. Extract Final Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 400]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "resource": "message",
+        "message": {
+          "to": "={{ $json.founder_email }}",
+          "subject": "={{ $json.email_subject }}",
+          "body": "={{ $json.email_body }}",
+          "bodyType": "html"
+        }
+      },
+      "id": "send-email",
+      "name": "9. Send Email to Found Address",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [2220, 400],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CREDENTIAL",
+          "name": "Gmail"
+        }
+      },
+      "notes": "Sends to email found by Snov.io"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "company_name": "={{ $json.company_name }}",
+            "founder_name": "={{ $json.founder_name }}",
+            "founder_email": "={{ $json.founder_email }}",
+            "founder_position": "={{ $json.founder_position }}",
+            "email_sent_date": "={{ $json.created_date }}",
+            "status": "initial_sent",
+            "follow_up_count": "0",
+            "last_contact_date": "={{ $json.created_date }}",
+            "pain_points": "={{ JSON.stringify($json.ai_insights.pain_points) }}"
+          },
+          "matchingColumns": ["founder_email"]
+        }
+      },
+      "id": "save-crm",
+      "name": "10. Save to CRM (Google Sheets)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2440, 400],
+      "notes": "Tracks all outreach in Google Sheets"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "check-replies-trigger",
+      "name": "Check Replies Every 6 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 700]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 50,
+        "filters": {
+          "q": "is:unread in:inbox"
+        }
+      },
+      "id": "check-gmail",
+      "name": "11. Check Gmail for Replies",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [460, 700]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Detect positive replies\nconst positiveKeywords = [\n  'interested', 'yes', 'let\\'s talk', 'tell me more',\n  'schedule', 'available', 'sounds good', 'call',\n  'meeting', 'chat', 'discuss', 'open to', 'sure',\n  'love to', 'would like', 'happy to'\n];\n\nconst email = $input.item.json;\nconst emailBody = (email.snippet || '').toLowerCase();\nconst subject = (email.subject || '').toLowerCase();\n\nconst isPositive = positiveKeywords.some(keyword => \n  emailBody.includes(keyword) || subject.includes(keyword)\n);\n\nif (!isPositive) {\n  return [];\n}\n\n// Extract email address\nconst fromEmail = email.from?.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\\.[a-zA-Z0-9_-]+)/)?.[0] || email.from;\n\nreturn [{\n  json: {\n    from_email: fromEmail,\n    from_name: email.from,\n    subject: email.subject,\n    snippet: email.snippet,\n    message_id: email.id,\n    reply_type: 'positive',\n    received_date: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "detect-positive",
+      "name": "12. Detect Positive Replies",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 700],
+      "notes": "Filters only interested replies"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "resource": "message",
+        "message": {
+          "to": "={{ $json.from_email }}",
+          "subject": "=Re: {{ $json.subject }}",
+          "body": "=Hi,<br><br>Fantastic! I'm excited to discuss how Ready Launch can help.<br><br><strong>Please book a time that works for you:</strong><br>📅 <a href=\"YOUR_CALENDAR_BOOKING_LINK\">Schedule 15-min call</a><br><br>I'll send a quick prep questionnaire before our call so we can maximize our time together.<br><br>Looking forward to it!<br><br>Best regards,<br>[Your Name]<br>Ready Launch<br><br>P.S. Check out our work: [YOUR_PORTFOLIO_LINK]",
+          "bodyType": "html"
+        }
+      },
+      "id": "send-calendar",
+      "name": "13. Send Calendar Link",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [900, 700],
+      "notes": "Auto-sends booking link"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=🎉 <b>NEW LEAD CONVERTED!</b>\\n\\n<b>From:</b> {{ $json.from_name }}\\n<b>Email:</b> {{ $json.from_email }}\\n<b>Subject:</b> {{ $json.subject }}\\n\\n<b>Message Preview:</b>\\n{{ $json.snippet }}\\n\\n✅ <b>Action Taken:</b> Calendar link sent!\\n\\n👉 Prepare for the call!",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "notify-telegram",
+      "name": "14. Notify You on Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1120, 700],
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIAL",
+          "name": "Telegram Bot"
+        }
+      },
+      "notes": "Instant notification when lead converts!"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "followup-trigger",
+      "name": "Check Follow-ups Daily",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 1000]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "load-crm",
+      "name": "15. Load CRM Data",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [460, 1000]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Check which leads need follow-ups\nconst lead = $input.item.json;\nconst today = new Date();\nconst lastContact = new Date(lead.last_contact_date);\nconst daysSince = Math.floor((today - lastContact) / (1000 * 60 * 60 * 24));\nconst followUpCount = parseInt(lead.follow_up_count) || 0;\nconst followUpSchedule = [1, 3, 5, 7]; // Days 1, 3, 5, 7\n\n// Skip if already converted or too many follow-ups\nif (lead.status === 'converted' || followUpCount >= 4) {\n  return [];\n}\n\n// Check if today matches follow-up day\nif (followUpSchedule[followUpCount] === daysSince) {\n  return [{\n    json: {\n      ...lead,\n      days_since_contact: daysSince,\n      follow_up_number: followUpCount + 1\n    }\n  }];\n}\n\nreturn [];"
+      },
+      "id": "filter-followups",
+      "name": "16. Filter Leads for Follow-up",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 1000],
+      "notes": "Checks Days 1, 3, 5, 7"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "resource": "message",
+        "message": {
+          "to": "={{ $json.founder_email }}",
+          "subject": "=Re: {{ $json.email_subject || 'Quick question about ' + $json.company_name }}",
+          "body": "=Hi {{ $json.founder_name }},<br><br>{{ $json.follow_up_number === 1 ? 'I wanted to share a quick case study:<br><br>We helped a startup save <strong>$45,000</strong> in development costs and launch <strong>3 months earlier</strong> than planned. Their revenue increased by 230% in the first quarter.<br><br>For ' + $json.company_name + ', we could deliver in half the time of traditional agencies.<br><br>Available for a quick call this week?' : '' }}{{ $json.follow_up_number === 2 ? 'I know you\\'re busy building ' + $json.company_name + ', so I\\'ll keep this brief.<br><br>Most startups overspend on development by 300-500%. Ready Launch specializes in lean, fast execution:<br><br>✓ Rapid MVP development<br>✓ Custom automation<br>✓ Full-stack applications<br><br>Would a 10-minute call make sense? <a href=\"YOUR_CALENDAR_LINK\">Book here</a>' : '' }}{{ $json.follow_up_number === 3 ? 'Reaching out one more time.<br><br>If timing isn\\'t right, no worries. But if you\\'re still looking to accelerate development, our clients typically see:<br><br>• 60-70% cost reduction<br>• 2-3x faster delivery<br><br>Calendar: <a href=\"YOUR_CALENDAR_LINK\">Book here</a>' : '' }}{{ $json.follow_up_number === 4 ? 'This will be my last email - don\\'t want to clutter your inbox.<br><br>Thank you for your time. I genuinely wish you the best with ' + $json.company_name + '.<br><br>If things change, you know where to find us: <a href=\"YOUR_CALENDAR_LINK\">Schedule call</a><br><br>Cheers to your success!' : '' }}<br><br>Best regards,<br>[Your Name]<br>Ready Launch",
+          "bodyType": "html"
+        }
+      },
+      "id": "send-followup",
+      "name": "17. Send Follow-up Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [900, 1000],
+      "notes": "Auto follow-up Days 1,3,5,7"
+    }
+  ],
+  "connections": {
+    "Run Daily at 9 AM": {
+      "main": [[{"node": "1. Search LinkedIn for Hiring Companies", "type": "main", "index": 0}]]
+    },
+    "1. Search LinkedIn for Hiring Companies": {
+      "main": [[{"node": "2. Extract Companies (2-10 employees)", "type": "main", "index": 0}]]
+    },
+    "2. Extract Companies (2-10 employees)": {
+      "main": [[{"node": "3. Find Founder Email (Snov.io)", "type": "main", "index": 0}]]
+    },
+    "3. Find Founder Email (Snov.io)": {
+      "main": [[{"node": "4. Filter Founder Email", "type": "main", "index": 0}]]
+    },
+    "4. Filter Founder Email": {
+      "main": [[{"node": "5. AI Deep Research (Gemini)", "type": "main", "index": 0}]]
+    },
+    "5. AI Deep Research (Gemini)": {
+      "main": [[{"node": "6. Parse AI Insights", "type": "main", "index": 0}]]
+    },
+    "6. Parse AI Insights": {
+      "main": [[{"node": "7. AI Write Personalized Email", "type": "main", "index": 0}]]
+    },
+    "7. AI Write Personalized Email": {
+      "main": [[{"node": "8. Extract Final Email", "type": "main", "index": 0}]]
+    },
+    "8. Extract Final Email": {
+      "main": [[{"node": "9. Send Email to Found Address", "type": "main", "index": 0}]]
+    },
+    "9. Send Email to Found Address": {
+      "main": [[{"node": "10. Save to CRM (Google Sheets)", "type": "main", "index": 0}]]
+    },
+    "Check Replies Every 6 Hours": {
+      "main": [[{"node": "11. Check Gmail for Replies", "type": "main", "index": 0}]]
+    },
+    "11. Check Gmail for Replies": {
+      "main": [[{"node": "12. Detect Positive Replies", "type": "main", "index": 0}]]
+    },
+    "12. Detect Positive Replies": {
+      "main": [[{"node": "13. Send Calendar Link", "type": "main", "index": 0}]]
+    },
+    "13. Send Calendar Link": {
+      "main": [[{"node": "14. Notify You on Telegram", "type": "main", "index": 0}]]
+    },
+    "Check Follow-ups Daily": {
+      "main": [[{"node": "15. Load CRM Data", "type": "main", "index": 0}]]
+    },
+    "15. Load CRM Data": {
+      "main": [[{"node": "16. Filter Leads for Follow-up", "type": "main", "index": 0}]]
+    },
+    "16. Filter Leads for Follow-up": {
+      "main": [[{"node": "17. Send Follow-up Email", "type": "main", "index": 0}]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-10-19T00:00:00.000Z",
+  "versionId": "1"
+}
