@@ -1,0 +1,430 @@
+{
+  "name": "Ready Launch Outreach Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Daily Trigger - 9 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.scraperapi.com/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "api_key",
+              "value": "={{$credentials.scraperApiKey}}"
+            },
+            {
+              "name": "url",
+              "value": "https://www.linkedin.com/jobs/search/?keywords=software%20developer&f_C=2-10"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Scrape LinkedIn Jobs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract company names and job details from scraped HTML\nconst html = $input.first().json.body;\nconst companies = [];\n\n// Simple regex to extract company info (adjust based on actual HTML structure)\nconst companyMatches = html.match(/company-name[^>]*>([^<]+)</g) || [];\nconst jobTitleMatches = html.match(/job-title[^>]*>([^<]+)</g) || [];\n\nfor (let i = 0; i < Math.min(companyMatches.length, 20); i++) {\n  companies.push({\n    company_name: companyMatches[i].replace(/<[^>]*>/g, '').trim(),\n    job_title: jobTitleMatches[i]?.replace(/<[^>]*>/g, '').trim() || 'Software Developer',\n    scraped_date: new Date().toISOString(),\n    status: 'new'\n  });\n}\n\nreturn companies.map(company => ({ json: company }));"
+      },
+      "name": "Extract Company Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.snov.io/v1/get-domain-emails-with-info",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$credentials.snovApiKey}}"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "domain",
+              "value": "={{$json.company_website}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Find Founder Email (Snov.io)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter to get only founder/CEO emails\nconst emailData = $input.first().json;\nconst founderKeywords = ['founder', 'ceo', 'cto', 'co-founder'];\n\nif (emailData.emails && emailData.emails.length > 0) {\n  const founderEmail = emailData.emails.find(email => \n    founderKeywords.some(keyword => \n      email.position?.toLowerCase().includes(keyword)\n    )\n  );\n  \n  if (founderEmail) {\n    return [{\n      json: {\n        ...item.json,\n        founder_name: founderEmail.firstName + ' ' + founderEmail.lastName,\n        founder_email: founderEmail.email,\n        founder_position: founderEmail.position\n      }\n    }];\n  }\n}\n\nreturn [];"
+      },
+      "name": "Filter Founder Emails",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{$credentials.gmailEmail}}",
+        "toEmail": "={{$json.founder_email}}",
+        "subject": "=Quick question about {{$json.company_name}}'s development needs",
+        "emailType": "html",
+        "message": "=Hi {{$json.founder_name}},\n\nI noticed {{$json.company_name}} is hiring for {{$json.job_title}}. \n\nAt Ready Launch, we help startups like yours build products 10X faster at a fraction of traditional costs.\n\nWe recently built:\n• An AI-powered video experience tool using Sora - users upload photos and interact with characters like Krishna from Mahabharata\n• Full-stack web applications with conversion-optimized SEO\n• Custom automation solutions\n\nGiven your focus on scaling, I'd love to show you how we can accelerate your product development.\n\nWould you be open to a 15-minute chat this week?\n\nBest,\n[Your Name]\nReady Launch",
+        "options": {}
+      },
+      "name": "Send Initial Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [1250, 300],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "1",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "resource": "row",
+        "sheetId": "={{$credentials.googleSheetId}}",
+        "range": "Sheet1!A:H",
+        "options": {},
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "company_name": "={{$json.company_name}}",
+            "founder_name": "={{$json.founder_name}}",
+            "founder_email": "={{$json.founder_email}}",
+            "job_title": "={{$json.job_title}}",
+            "email_sent_date": "={{new Date().toISOString()}}",
+            "status": "initial_sent",
+            "follow_up_count": "0",
+            "last_contact": "={{new Date().toISOString()}}"
+          }
+        }
+      },
+      "name": "Save to Google Sheets CRM",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 */6 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Check Replies Every 6 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 600]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "returnAll": true,
+        "filters": {
+          "q": "is:unread from:(*)"
+        }
+      },
+      "name": "Check Gmail for Replies",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [450, 600]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Detect positive replies\nconst positiveKeywords = ['interested', 'yes', 'let\\'s talk', 'tell me more', 'schedule', 'available', 'sounds good', 'call'];\nconst emailBody = $json.snippet?.toLowerCase() || '';\n\nconst isPositive = positiveKeywords.some(keyword => emailBody.includes(keyword));\n\nif (isPositive) {\n  return [{ json: { ...$json, reply_type: 'positive' } }];\n}\n\nreturn [];"
+      },
+      "name": "Detect Positive Replies",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 600]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{$credentials.gmailEmail}}",
+        "toEmail": "={{$json.from}}",
+        "subject": "=Re: {{$json.subject}}",
+        "emailType": "html",
+        "message": "=Hi,\n\nFantastic! I'm excited to discuss how Ready Launch can help.\n\nPlease book a time that works best for you here:\n{{$credentials.calendarLink}}\n\nLooking forward to it!\n\nBest,\n[Your Name]\nReady Launch",
+        "options": {}
+      },
+      "name": "Send Calendar Link",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [850, 600]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$credentials.telegramChatId}}",
+        "text": "=🎉 NEW LEAD CONVERTED!\n\nFrom: {{$json.from}}\nSubject: {{$json.subject}}\n\nMessage: {{$json.snippet}}\n\nAction: Calendar link sent!",
+        "additionalFields": {}
+      },
+      "name": "Notify on Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [1050, 600],
+      "credentials": {
+        "telegramApi": {
+          "id": "2",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 15 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Daily Follow-up Check - 3 PM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 900]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "sheetId": "={{$credentials.googleSheetId}}",
+        "range": "Sheet1!A:H",
+        "options": {}
+      },
+      "name": "Load CRM Data",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [450, 900]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check which leads need follow-ups\nconst today = new Date();\nconst followUpSchedule = [1, 3, 5, 7]; // Days to follow up\nconst leadsToFollowUp = [];\n\nfor (const lead of $input.all()) {\n  const lastContact = new Date(lead.json.last_contact);\n  const daysSince = Math.floor((today - lastContact) / (1000 * 60 * 60 * 24));\n  const followUpCount = parseInt(lead.json.follow_up_count) || 0;\n  \n  // Check if it's time for next follow-up\n  if (followUpSchedule[followUpCount] === daysSince && lead.json.status !== 'converted') {\n    leadsToFollowUp.push({\n      json: {\n        ...lead.json,\n        days_since_contact: daysSince,\n        follow_up_number: followUpCount + 1\n      }\n    });\n  }\n}\n\nreturn leadsToFollowUp;"
+      },
+      "name": "Filter Leads Needing Follow-up",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 900]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.follow_up_number}}",
+              "operation": "equal",
+              "value2": 1
+            }
+          ]
+        }
+      },
+      "name": "Day 1 Follow-up",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 800]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.follow_up_number}}",
+              "operation": "equal",
+              "value2": 2
+            }
+          ]
+        }
+      },
+      "name": "Day 3 Follow-up",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 900]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.follow_up_number}}",
+              "operation": "equal",
+              "value2": 3
+            }
+          ]
+        }
+      },
+      "name": "Day 5 Follow-up",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 1000]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.follow_up_number}}",
+              "operation": "equal",
+              "value2": 4
+            }
+          ]
+        }
+      },
+      "name": "Day 7 Thank You",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 1100]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{$credentials.gmailEmail}}",
+        "toEmail": "={{$json.founder_email}}",
+        "subject": "=Re: Quick question about {{$json.company_name}}",
+        "emailType": "html",
+        "message": "=Hi {{$json.founder_name}},\n\nI wanted to share a quick case study:\n\nWe helped a startup save $45,000 in development costs and launch 3 months earlier than planned. Their revenue increased by 230% in the first quarter.\n\nFor {{$json.company_name}}, we could deliver in half the time of traditional agencies.\n\nAre you available for a quick call this week?\n\nBest,\n[Your Name]"
+      },
+      "name": "Send Day 1 Follow-up",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [1050, 800]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{$credentials.gmailEmail}}",
+        "toEmail": "={{$json.founder_email}}",
+        "subject": "=Last thought on {{$json.company_name}}",
+        "emailType": "html",
+        "message": "=Hi {{$json.founder_name}},\n\nI know you're busy, so I'll keep this brief.\n\nReady Launch specializes in:\n✓ Rapid MVP development\n✓ Full-stack web applications\n✓ Custom automation\n\nWould a 10-minute call make sense? Here's my calendar: {{$credentials.calendarLink}}\n\nBest,\n[Your Name]"
+      },
+      "name": "Send Day 3 Follow-up",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [1050, 900]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{$credentials.gmailEmail}}",
+        "toEmail": "={{$json.founder_email}}",
+        "subject": "=Quick question - {{$json.founder_name}}",
+        "emailType": "html",
+        "message": "=Hi {{$json.founder_name}},\n\nReaching out one more time. If the timing isn't right, no worries.\n\nOur clients typically see 60-70% cost reduction vs traditional agencies.\n\nCalendar: {{$credentials.calendarLink}}\n\nBest,\n[Your Name]"
+      },
+      "name": "Send Day 5 Follow-up",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [1050, 1000]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{$credentials.gmailEmail}}",
+        "toEmail": "={{$json.founder_email}}",
+        "subject": "=Thank you + staying in touch",
+        "emailType": "html",
+        "message": "=Hi {{$json.founder_name}},\n\nThis will be my last email - don't want to clutter your inbox.\n\nThank you for your time. I genuinely wish you the best with {{$json.company_name}}.\n\nIf things change, you know where to find us: {{$credentials.calendarLink}}\n\nCheers,\n[Your Name]"
+      },
+      "name": "Send Day 7 Thank You",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [1050, 1100]
+    }
+  ],
+  "connections": {
+    "Daily Trigger - 9 AM": {
+      "main": [[{"node": "Scrape LinkedIn Jobs", "type": "main", "index": 0}]]
+    },
+    "Scrape LinkedIn Jobs": {
+      "main": [[{"node": "Extract Company Data", "type": "main", "index": 0}]]
+    },
+    "Extract Company Data": {
+      "main": [[{"node": "Find Founder Email (Snov.io)", "type": "main", "index": 0}]]
+    },
+    "Find Founder Email (Snov.io)": {
+      "main": [[{"node": "Filter Founder Emails", "type": "main", "index": 0}]]
+    },
+    "Filter Founder Emails": {
+      "main": [[{"node": "Send Initial Email", "type": "main", "index": 0}]]
+    },
+    "Send Initial Email": {
+      "main": [[{"node": "Save to Google Sheets CRM", "type": "main", "index": 0}]]
+    },
+    "Check Replies Every 6 Hours": {
+      "main": [[{"node": "Check Gmail for Replies", "type": "main", "index": 0}]]
+    },
+    "Check Gmail for Replies": {
+      "main": [[{"node": "Detect Positive Replies", "type": "main", "index": 0}]]
+    },
+    "Detect Positive Replies": {
+      "main": [[{"node": "Send Calendar Link", "type": "main", "index": 0}]]
+    },
+    "Send Calendar Link": {
+      "main": [[{"node": "Notify on Telegram", "type": "main", "index": 0}]]
+    },
+    "Daily Follow-up Check - 3 PM": {
+      "main": [[{"node": "Load CRM Data", "type": "main", "index": 0}]]
+    },
+    "Load CRM Data": {
+      "main": [[{"node": "Filter Leads Needing Follow-up", "type": "main", "index": 0}]]
+    },
+    "Filter Leads Needing Follow-up": {
+      "main": [[
+        {"node": "Day 1 Follow-up", "type": "main", "index": 0},
+        {"node": "Day 3 Follow-up", "type": "main", "index": 0},
+        {"node": "Day 5 Follow-up", "type": "main", "index": 0},
+        {"node": "Day 7 Thank You", "type": "main", "index": 0}
+      ]]
+    },
+    "Day 1 Follow-up": {
+      "main": [[{"node": "Send Day 1 Follow-up", "type": "main", "index": 0}]]
+    },
+    "Day 3 Follow-up": {
+      "main": [[{"node": "Send Day 3 Follow-up", "type": "main", "index": 0}]]
+    },
+    "Day 5 Follow-up": {
+      "main": [[{"node": "Send Day 5 Follow-up", "type": "main", "index": 0}]]
+    },
+    "Day 7 Thank You": {
+      "main": [[{"node": "Send Day 7 Thank You", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {},
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-10-19T00:00:00.000Z",
+  "versionId": "1"
+}
