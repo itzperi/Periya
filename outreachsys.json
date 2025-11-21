@@ -1,0 +1,699 @@
+{
+  "id": "Ck4FPsvN4Os758Yx",
+  "meta": {
+    "instanceId": "d96fee0ffb612f8ab94bbb727b06f10393a184aacfea6cf913b87b23a64805a8",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "browseract_scraping",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "5befb977-82ff-4e69-bb8a-aa5058af6980",
+      "name": "If",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1088,
+        64
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "142abde8-01ae-4dae-9ad5-5493e7c72184",
+              "operator": {
+                "type": "number",
+                "operation": "notExists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.error }}",
+              "rightValue": ""
+            },
+            {
+              "id": "49b4a0b5-c02d-405e-9810-73c9f764b53a",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              },
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "null"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "a0ba61fd-2401-4d9c-a22b-95545c5ba835",
+      "name": "Wait",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        1296,
+        272
+      ],
+      "webhookId": "3851851c-02ba-439e-8cf9-7157f34aec73",
+      "parameters": {
+        "amount": 15
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "3d2758f4-0be2-4e32-9a9b-4eff9b816a62",
+      "name": "Code in JavaScript",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1632,
+        48
+      ],
+      "parameters": {
+        "jsCode": "// 1️⃣ Get the string from the AI Agent output\nlet raw = $json[\"output\"] || \"\";\n\n// 2️⃣ Remove markdown fences and unwanted characters\nraw = raw\n  .replace(/```json|```/g, '')   // remove ```json and ```\n  .trim();\n\n// 3️⃣ Try to parse the JSON safely\nlet data = [];\ntry {\n  data = JSON.parse(raw);\n} catch (e) {\n  console.error(\"❌ JSON parsing failed:\", e);\n  return [];\n}\n\n// 4️⃣ Ensure it's an array and return as multiple items\nif (!Array.isArray(data)) data = [data];\n\n// 5️⃣ n8n expects an array of { json: {...} } objects\nreturn data.map(entry => ({ json: entry }));\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "decfd8ac-46cc-4776-97f5-409b481c38b3",
+      "name": "AI Agent1",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        2048,
+        48
+      ],
+      "parameters": {
+        "text": "=You are an AI agent that processes business leads and manages outreach emails.\nYou can use these tools in this workflow:\n\nread:sheet → Get all rows from the Google Sheet.\n\nappend:sheet → Add a new row in the Google Sheet.\n\nduplicate → Add duplicate business entries to the sheet.\n\nsend:message → Send an email using Gmail.\n\n🪄 What You Need To Do (Step-by-Step)\n\n1️⃣ Always start by running read:sheet\n\nThis gets all existing rows from the Google Sheet.\n\nUse this list to check if the new business already exists.\n\n2️⃣ Check for duplicate business name\n\nCompare {{ $json.business_name }} from the input with business_name from the sheet.\n\nIf a match is found:\n\nUse duplicate to save the record.\n\nSet email_sent = \"Duplicate - Already Exist\".\n\nStop processing that record.\n\n3️⃣ If not duplicate found → than run the other tool like gmail and append row in sheet .\n\nIf {{ $json.email_address }} is empty or does not contain \"@\":\n\nrun the Append row's in sheet (append:sheet) to save the record.\n\nSet email_sent = \"Pending - Invalid Email\".\n\nDo not send an email.\n\nStop processing that record.\n\n4️⃣ If {{ $json.email_address }}  is valid → Send the email\n\nUse send:message to send the email.\n\nAfter sending:\n\nIf successful → run Append row's in Sheet(append:sheet) with email_sent = \"Successful\".\n\nIf failed → run Append row's in Sheet (append:sheet) with email_sent = \"Pending - not found email\".\n\n5️⃣ Email sending limit\n\nDo not send more than 2 emails per workflow run.\n\n📦 Output Format\n\nAlways return a JSON array with the final status for each business:\n\n[\n  {\n    \"business_name\": \"ABC Restaurant\",\n    \"email_sent\": \"Successful\"\n  },\n  {\n    \"business_name\": \"XYZ Foods\",\n    \"email_sent\": \"Duplicate - Already Exist\"\n  },\n  {\n    \"business_name\": \"Fresh Eats\",\n    \"email_sent\": \"Pending - Invalid Email\"\n  }\n]\n\n📋 Rules\n\nAlways run read:sheet first before doing anything else.\nafter that check if value is duplicate than run the duplicate (append:sheet)tool ,else run the gmail and append row in sheet tool according to the instruction.\nNever ask for user input.\n\nAlways call the right tool based on the conditions above.\n\nAlways include the final email_sent status in the JSON output.\n\nNote: Do not store the duplicate data in google sheet, else if duplicate data found than run the duplicate tool only.\n\nAfter running the read sheet node you must too execute other node as well accoording to there logics and rules. ",
+        "options": {},
+        "promptType": "define"
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "7a552baf-53e0-47ba-b95f-a270af32f262",
+      "name": "Google Gemini Chat Model1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "position": [
+        1872,
+        384
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "sqdnqJfjbh8KF5Js",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "92b85b02-e515-440a-b965-3028a8371b93",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        1312,
+        48
+      ],
+      "parameters": {
+        "text": "=You are a data extraction assistant.\n\nYou will receive JSON from BrowserAct API containing {{ $json.output.string }}\nFrom this extract the mentioned data below . \n1. Each entry must include exactly these keys:\n   - business_name\n   - website_url\n   - phone_number\n   - email_address\n   - rating\n4. If a value is missing, use an empty string.\n5. Output ONLY the final JSON array, with no Markdown, backticks, or explanation.\n\n",
+        "options": {},
+        "promptType": "define"
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "2d25744e-9566-4a7f-96c4-2ede4d9237f0",
+      "name": "Google Gemini Chat Model2",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "position": [
+        1552,
+        336
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "sqdnqJfjbh8KF5Js",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a1835451-61ed-4046-8004-852662c4c336",
+      "name": "duplicate",
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "position": [
+        2224,
+        384
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "email_sent": "=duplicate data (already exist)"
+          },
+          "schema": [
+            {
+              "id": "business_name",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "business_name",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone_number",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "phone_number",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email_address",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "email_address",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "website_url",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "website_url",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "rating",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "rating",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email_sent",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "email_sent",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {},
+        "operation": "append",
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1PxksaSGYYwNx_s1a_tYBwQ4FPsR1mqj24syeZcdbmOU/edit#gid=0",
+          "cachedResultName": "Sheet1"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1PxksaSGYYwNx_s1a_tYBwQ4FPsR1mqj24syeZcdbmOU",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1PxksaSGYYwNx_s1a_tYBwQ4FPsR1mqj24syeZcdbmOU/edit?usp=drivesdk",
+          "cachedResultName": "lead for vapi"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "ApynlWKCyipKA57d",
+          "name": "Google Sheets account"
+        }
+      },
+      "typeVersion": 4.7
+    },
+    {
+      "id": "d49e537e-65fa-4972-90c3-2a5e1bc6e478",
+      "name": "get row's in sheet",
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "position": [
+        2064,
+        384
+      ],
+      "parameters": {
+        "options": {},
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1PxksaSGYYwNx_s1a_tYBwQ4FPsR1mqj24syeZcdbmOU/edit#gid=0",
+          "cachedResultName": "Sheet1"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1PxksaSGYYwNx_s1a_tYBwQ4FPsR1mqj24syeZcdbmOU",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1PxksaSGYYwNx_s1a_tYBwQ4FPsR1mqj24syeZcdbmOU/edit?usp=drivesdk",
+          "cachedResultName": "lead for vapi"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "ApynlWKCyipKA57d",
+          "name": "Google Sheets account"
+        }
+      },
+      "typeVersion": 4.7
+    },
+    {
+      "id": "69356929-da27-495e-bc36-33f5dcb20a69",
+      "name": "send a message in gmail",
+      "type": "n8n-nodes-base.gmailTool",
+      "position": [
+        2368,
+        384
+      ],
+      "webhookId": "1fbd849e-dd8c-4160-8b5e-7f17971ff6da",
+      "parameters": {
+        "sendTo": "={{ $('Code in JavaScript').item.json.email_address }}",
+        "message": "=Hi {{ $('Code in JavaScript').item.json.business_name }},  I'm [Bakir Ali], reaching out because I believe we can significantly help {{ $('Code in JavaScript').item.json.business_name }} thrive even further.  Managing social media and generating quality leads for clients can be incredibly time-consuming and complex.  Our automation solution is designed specifically for digital marketing agencies like yours to: - Automate repetitive social media tasks: Freeing up your team for more strategic work. - Supercharge lead generation: Ensuring a consistent flow of qualified leads. - Reduce complexity & boost results: Achieve more with less manual effort.  We help agencies save valuable time, cut down on complex tasks, and deliver better results for their clients.  Would you be open to a quick 10-15 minute chat next week to see how this could specifically benefit {{ $('Code in JavaScript').item.json.business_name }}?  Best regards, Bakir Ali AI Automation Specialist",
+        "options": {},
+        "subject": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Subject', ``, 'string') }}",
+        "emailType": "text"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "LmV07TB9v0HxQBO5",
+          "name": "Gmail account"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "bbc7e2ab-7205-49d6-aeaf-9cd90b2d74b7",
+      "name": "append row in sheet",
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "position": [
+        2544,
+        384
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "rating": "={{ $('Code in JavaScript').item.json.rating }}",
+            "email_sent": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('email_sent', ``, 'string') }}",
+            "website_url": "={{ $('Code in JavaScript').item.json.website_url }}",
+            "phone_number": "={{ $('Code in JavaScript').item.json.phone_number }}",
+            "business_name": "={{ $('Code in JavaScript').item.json.business_name }}",
+            "email_address": "={{ $('Code in JavaScript').item.json.email_address }}"
+          },
+          "schema": [
+            {
+              "id": "business_name",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "business_name",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone_number",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "phone_number",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email_address",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "email_address",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "website_url",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "website_url",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "rating",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "rating",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email_sent",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "email_sent",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {},
+        "operation": "append",
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1PxksaSGYYwNx_s1a_tYBwQ4FPsR1mqj24syeZcdbmOU/edit#gid=0",
+          "cachedResultName": "Sheet1"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1PxksaSGYYwNx_s1a_tYBwQ4FPsR1mqj24syeZcdbmOU",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1PxksaSGYYwNx_s1a_tYBwQ4FPsR1mqj24syeZcdbmOU/edit?usp=drivesdk",
+          "cachedResultName": "lead for vapi"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "ApynlWKCyipKA57d",
+          "name": "Google Sheets account"
+        }
+      },
+      "typeVersion": 4.7
+    },
+    {
+      "id": "9ab75290-675b-4133-a0bb-3dbf32da494a",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        720,
+        64
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "0536d718-fbf8-4cef-aeb7-c38c298a2e84",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        0,
+        -96
+      ],
+      "parameters": {
+        "width": 576,
+        "height": 400,
+        "content": "This n8n template automates business lead scraping using BrowserAct, cleans the data with AI Agents, checks duplicates, sends outreach emails via Gmail, and stores results in Google Sheets.\n\n## How it works\n\nThe workflow starts automatically with a Schedule Trigger.\n\nBrowserAct collects business details based on keywords and location.\n\nAn If node checks if the scraping output is valid.\n\nAI Agent 1 (Gemini) extracts clean business data into structured JSON.\n\nA Code node formats and parses the AI output.\n\nGoogle Sheets is used to read existing rows and identify duplicates.\n\nAI Agent 2 (Gemini) decides: duplicate, invalid email, or send outreach email.\n\nGmail Node sends personalized emails to valid leads.\n\nGoogle Sheets appends each processed business with the final status.\n\nA Wait node controls the sending speed and limits email volume."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b0a7c410-1205-4021-94b1-c53f87ab52ac",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        0,
+        336
+      ],
+      "parameters": {
+        "width": 576,
+        "height": 304,
+        "content": "## How to use it\n\nCreate the lead_scraping workflow inside your BrowserAct account.\n\nAdd your BrowserAct API token to the BrowserAct node inside this workflow.\n\nReplace the default workflow_id with your actual BrowserAct workflow ID.\n\nConnect your Google Gemini API credentials to both AI Agent nodes.\n\nConnect your Google Sheets account and select the sheet where the leads will be stored.\n\nConnect your Gmail account to the Gmail node for sending outreach emails."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "035edeff-c847-4462-87ba-220b77df65c9",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        656,
+        -96
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 1104,
+        "height": 736,
+        "content": "## Data Scrap & Structured"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2f14ad00-f694-496e-bbae-e05b2d08fac7",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1776,
+        -96
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 928,
+        "height": 736,
+        "content": "## Data search, append, email, update\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9e31ce42-a050-4e11-b352-275fbb384f4e",
+      "name": "Run a workflow1",
+      "type": "n8n-nodes-browseract.browserAct",
+      "position": [
+        896,
+        64
+      ],
+      "parameters": {
+        "type": "WORKFLOW",
+        "workflowId": "57106183414275194",
+        "workflowConfig": {
+          "value": {},
+          "schema": [
+            {
+              "id": "input-location",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "description": "If left blank, the default value defined in BrowserAct will be used.",
+              "displayName": "location",
+              "defaultMatch": true
+            },
+            {
+              "id": "input-keywords",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "description": "If left blank, the default value defined in BrowserAct will be used.",
+              "displayName": "keywords",
+              "defaultMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "input-location",
+            "input-keywords"
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "credentials": {
+        "browserActApi": {
+          "id": "niKpHPvMWkbxnU1q",
+          "name": "BrowserAct account"
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "db01d598-1b82-4439-bf10-f2276993594f",
+  "connections": {
+    "If": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "duplicate": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run a workflow1": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Run a workflow1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get row's in sheet": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "append row in sheet": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send a message in gmail": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
