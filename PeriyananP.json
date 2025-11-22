@@ -1,0 +1,662 @@
+{
+  "name": "Lead Generation & Outreach Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Daily Trigger - 9 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.brightdata.com/datasets/v3/trigger",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_BRIGHT_DATA_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "dataset_id",
+              "value": "gd_l7q7dkf244hwjntr0"
+            },
+            {
+              "name": "format",
+              "value": "json"
+            },
+            {
+              "name": "include_contacts",
+              "value": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Bright Data - Scrape Leads",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter and extract decision makers from scraped data\nconst targetTitles = [\n  'CTO', 'Chief Technology Officer', 'VP Operations',\n  'Director of Operations', 'VP IT', 'Director IT',\n  'COO', 'Chief Operating Officer', 'Head of Manufacturing'\n];\n\nconst decisionMakers = [];\n\nfor (const item of $input.all()) {\n  const company = item.json;\n  \n  // Check if company has contacts\n  if (company.contacts && Array.isArray(company.contacts)) {\n    company.contacts.forEach(contact => {\n      const title = contact.title || '';\n      \n      // Check if title matches target titles\n      const matchesTitle = targetTitles.some(targetTitle => \n        title.toLowerCase().includes(targetTitle.toLowerCase())\n      );\n      \n      if (matchesTitle && contact.email) {\n        decisionMakers.push({\n          company: company.name || 'Unknown Company',\n          industry: company.industry || 'Technology',\n          employeeCount: company.employee_count || 2500,\n          firstName: contact.first_name || 'there',\n          lastName: contact.last_name || '',\n          email: contact.email,\n          title: contact.title,\n          status: 'new',\n          lastContact: new Date().toISOString(),\n          followUpDay: 0,\n          interested: false,\n          dateAdded: new Date().toISOString()\n        });\n      }\n    });\n  }\n}\n\nreturn decisionMakers.map(dm => ({ json: dm }));"
+      },
+      "name": "Filter Decision Makers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Leads",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Company": "={{ $json.company }}",
+            "First Name": "={{ $json.firstName }}",
+            "Last Name": "={{ $json.lastName }}",
+            "Email": "={{ $json.email }}",
+            "Title": "={{ $json.title }}",
+            "Industry": "={{ $json.industry }}",
+            "Employee Count": "={{ $json.employeeCount }}",
+            "Status": "={{ $json.status }}",
+            "Last Contact": "={{ $json.lastContact }}",
+            "Follow Up Day": "={{ $json.followUpDay }}",
+            "Interested": "={{ $json.interested ? 'Yes' : 'No' }}",
+            "Date Added": "={{ $json.dateAdded }}"
+          }
+        },
+        "options": {}
+      },
+      "name": "Save to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        900,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Personalize email template for initial outreach\nconst lead = $input.item.json;\n\nconst softwareName = 'YourSoftware Pro';\nconst yourName = 'Your Name';\nconst yourTitle = 'Your Title';\nconst yourCompany = 'Your Company';\nconst demoUrl = 'https://yoursoftware.com/demo';\nconst bookingUrl = 'https://calendly.com/yourcompany';\n\nconst subject = `Increase ${lead.company} Revenue by 25-40% - Quick Question`;\n\nconst body = `Hi ${lead.firstName},\n\nI noticed ${lead.company} is a leading player in the ${lead.industry} space with around ${lead.employeeCount} employees.\n\nWe help companies like yours:\n• Reduce operational costs by 30%\n• Increase production efficiency by 25%\n• Improve revenue by 25-40% in the first year\n\nOur software ${softwareName} has helped similar manufacturing and IT companies automate workflows and drive measurable ROI.\n\nWould you be open to a 15-minute call to see if this could work for ${lead.company}?\n\nHere's our demo: ${demoUrl}\nOr book a call: ${bookingUrl}\n\nBest regards,\n${yourName}\n${yourTitle}\n${yourCompany}`;\n\nreturn [{\n  json: {\n    ...lead,\n    subject,\n    body,\n    templateType: 'initial'\n  }\n}];"
+      },
+      "name": "Personalize Initial Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {
+          "senderName": "Your Name"
+        }
+      },
+      "name": "Send Initial Email (Gmail)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        300
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 */6 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Check Emails Every 6 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "filters": {
+          "labelIds": [
+            "INBOX"
+          ],
+          "includeSpamTrash": false,
+          "readStatus": "unread"
+        },
+        "options": {
+          "attachmentsPrefix": "attachment_"
+        }
+      },
+      "name": "Gmail - Get Unread Replies",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        460,
+        600
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check if reply indicates interest\nconst positiveKeywords = [\n  'yes', 'interested', 'tell me more', 'schedule',\n  'call', 'demo', 'sounds good', \"let's talk\",\n  'more information', 'curious', 'available'\n];\n\nconst email = $input.item.json;\nconst body = (email.snippet || '').toLowerCase();\nconst subject = (email.subject || '').toLowerCase();\nconst fromEmail = email.from || '';\n\nconst isInterested = positiveKeywords.some(keyword => \n  body.includes(keyword) || subject.includes(keyword)\n);\n\nreturn [{\n  json: {\n    fromEmail,\n    body: email.snippet,\n    subject: email.subject,\n    isInterested,\n    messageId: email.id,\n    threadId: email.threadId\n  }\n}];"
+      },
+      "name": "Detect Interest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.isInterested }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Is Interested?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        900,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Leads",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "interested",
+            "Interested": "Yes",
+            "Last Contact": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {
+          "dataLocationOnSheet": "headerRow",
+          "lookupColumn": "Email",
+          "lookupValue": "={{ $json.fromEmail }}"
+        }
+      },
+      "name": "Update Sheet - Interested",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1120,
+        500
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Create thank you / next steps email\nconst reply = $input.item.json;\nconst softwareName = 'YourSoftware Pro';\nconst bookingUrl = 'https://calendly.com/yourcompany';\nconst yourName = 'Your Name';\n\nconst subject = `Re: Next steps - ${softwareName}`;\nconst body = `Hi there,\n\nThank you so much for your interest! I'm excited to show you how ${softwareName} can drive real results for your company.\n\nHere are the next steps:\n\n1. Schedule a 15-minute discovery call: ${bookingUrl}\n2. Or reply with your availability and I'll send a calendar invite\n3. We'll prepare a custom demo based on your specific needs\n\nLooking forward to speaking with you!\n\nBest,\n${yourName}`;\n\nreturn [{\n  json: {\n    to: reply.fromEmail,\n    subject,\n    body,\n    threadId: reply.threadId\n  }\n}];"
+      },
+      "name": "Create Thank You Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {
+          "senderName": "Your Name",
+          "threadId": "={{ $json.threadId }}"
+        }
+      },
+      "name": "Send Thank You Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        500
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 10 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Daily Follow-up Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Leads",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "name": "Read All Leads",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        460,
+        900
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Calculate which leads need follow-up\nconst leads = $input.all();\nconst followUpSchedule = { day2: 2, day3: 3, day5: 5, day7: 7 };\nconst today = new Date();\nconst leadsToFollowUp = [];\n\nfor (const item of leads) {\n  const lead = item.json;\n  \n  // Skip if interested or no last contact\n  if (lead.Interested === 'Yes' || !lead['Last Contact']) continue;\n  \n  const lastContactDate = new Date(lead['Last Contact']);\n  const daysSinceContact = Math.floor((today - lastContactDate) / (1000 * 60 * 60 * 24));\n  const followUpDay = parseInt(lead['Follow Up Day']) || 0;\n  \n  let templateType = null;\n  let nextFollowUpDay = followUpDay;\n  \n  // Determine which follow-up to send\n  if (daysSinceContact >= followUpSchedule.day7 && followUpDay < 4) {\n    templateType = 'day7';\n    nextFollowUpDay = 4;\n  } else if (daysSinceContact >= followUpSchedule.day5 && followUpDay < 3) {\n    templateType = 'day5';\n    nextFollowUpDay = 3;\n  } else if (daysSinceContact >= followUpSchedule.day3 && followUpDay < 2) {\n    templateType = 'day3';\n    nextFollowUpDay = 2;\n  } else if (daysSinceContact >= followUpSchedule.day2 && followUpDay < 1) {\n    templateType = 'day2';\n    nextFollowUpDay = 1;\n  }\n  \n  if (templateType) {\n    leadsToFollowUp.push({\n      json: {\n        company: lead.Company,\n        firstName: lead['First Name'],\n        email: lead.Email,\n        industry: lead.Industry,\n        templateType,\n        nextFollowUpDay,\n        daysSinceContact\n      }\n    });\n  }\n}\n\nreturn leadsToFollowUp;"
+      },
+      "name": "Calculate Follow-ups Needed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate follow-up email based on template type\nconst lead = $input.item.json;\nconst softwareName = 'YourSoftware Pro';\nconst yourName = 'Your Name';\nconst demoUrl = 'https://yoursoftware.com/demo';\nconst bookingUrl = 'https://calendly.com/yourcompany';\n\nlet subject, body;\n\nif (lead.templateType === 'day2') {\n  subject = `Re: Quick follow-up for ${lead.company}`;\n  body = `Hi ${lead.firstName},\n\nI wanted to follow up on my previous email about helping ${lead.company} increase revenue and operational efficiency.\n\nI understand you're busy, so I'll keep this brief:\n\n✓ 30% cost reduction in operations\n✓ 25-40% revenue increase\n✓ Automated reporting and analytics\n\nWould next week work for a brief 15-minute call?\n\nBest,\n${yourName}`;\n\n} else if (lead.templateType === 'day3') {\n  subject = `One more try - ${lead.company} + ${softwareName}`;\n  body = `Hi ${lead.firstName},\n\nI know your inbox is probably flooded, so I'll make this quick.\n\nOur clients in ${lead.industry} typically see:\n• ROI within 3-6 months\n• 40% faster decision-making\n• Significant competitive advantage\n\nIf this isn't a priority right now, no worries at all. Just reply with \"Not interested\" and I won't bother you again.\n\nOtherwise, here's my calendar: ${bookingUrl}\n\nCheers,\n${yourName}`;\n\n} else if (lead.templateType === 'day5') {\n  subject = `Case study: How similar companies increased revenue 35%`;\n  body = `Hi ${lead.firstName},\n\nI wanted to share a quick case study that might be relevant to ${lead.company}.\n\nOne of our clients, a ${lead.industry} company with 2,500 employees, implemented ${softwareName} and saw:\n\n📈 35% revenue increase in Year 1\n⚡ 50% faster production cycles\n💰 $2.3M in cost savings\n\nI think ${lead.company} could see similar results. Would you like to see how?\n\nReply with \"YES\" and I'll send over the full case study.\n\nBest,\n${yourName}`;\n\n} else if (lead.templateType === 'day7') {\n  subject = `Final note - Thank you ${lead.firstName}`;\n  body = `Hi ${lead.firstName},\n\nI wanted to reach out one last time and say thank you for your time, even if we didn't get a chance to connect.\n\nI understand timing isn't always right, and that's completely okay.\n\nIf things change in the future and you'd like to explore how ${softwareName} can help ${lead.company} increase revenue and efficiency, feel free to reach out anytime.\n\nI'll leave you with our demo link if you'd like to explore on your own time: ${demoUrl}\n\nWishing you and ${lead.company} continued success!\n\nBest regards,\n${yourName}`;\n}\n\nreturn [{\n  json: {\n    ...lead,\n    subject,\n    body\n  }\n}];"
+      },
+      "name": "Generate Follow-up Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {
+          "senderName": "Your Name"
+        }
+      },
+      "name": "Send Follow-up Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        900
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Leads",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Last Contact": "={{ $now.toISO() }}",
+            "Follow Up Day": "={{ $json.nextFollowUpDay }}",
+            "Status": "={{ $json.templateType === 'day7' ? 'completed' : 'follow-up-sent' }}"
+          }
+        },
+        "options": {
+          "dataLocationOnSheet": "headerRow",
+          "lookupColumn": "Email",
+          "lookupValue": "={{ $json.email }}"
+        }
+      },
+      "name": "Update Sheet - Follow-up Sent",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1340,
+        900
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "messageId": "={{ $json.messageId }}",
+        "labelIds": [],
+        "removeLabelIds": [
+          "UNREAD"
+        ]
+      },
+      "name": "Mark Email as Read",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        700
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Daily Trigger - 9 AM": {
+      "main": [
+        [
+          {
+            "node": "Bright Data - Scrape Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bright Data - Scrape Leads": {
+      "main": [
+        [
+          {
+            "node": "Filter Decision Makers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Decision Makers": {
+      "main": [
+        [
+          {
+            "node": "Save to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Personalize Initial Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Personalize Initial Email": {
+      "main": [
+        [
+          {
+            "node": "Send Initial Email (Gmail)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Emails Every 6 Hours": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Get Unread Replies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail - Get Unread Replies": {
+      "main": [
+        [
+          {
+            "node": "Detect Interest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Interest": {
+      "main": [
+        [
+          {
+            "node": "Is Interested?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Interested?": {
+      "main": [
+        [
+          {
+            "node": "Update Sheet - Interested",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Email as Read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Sheet - Interested": {
+      "main": [
+        [
+          {
+            "node": "Create Thank You Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Thank You Email": {
+      "main": [
+        [
+          {
+            "node": "Send Thank You Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Follow-up Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read All Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read All Leads": {
+      "main": [
+        [
+          {
+            "node": "Calculate Follow-ups Needed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Follow-ups Needed": {
+      "main": [
+        [
+          {
+            "node": "Generate Follow-up Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Follow-up Email": {
+      "main": [
+        [
+          {
+            "node": "Send Follow-up Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Follow-up Email": {
+      "main": [
+        [
+          {
+            "node": "Update Sheet - Follow-up Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
